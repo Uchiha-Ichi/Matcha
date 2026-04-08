@@ -15,6 +15,7 @@ import { ConceptsModule } from './concepts/concepts.module';
 import { PartnersModule } from './partners/partners.module';
 import { CategoriesModule } from './categories/categories.module';
 import { UsersModule } from './users/users.module';
+import { PromotionsModule } from './promotions/promotions.module';
 
 @Module({
   imports: [
@@ -71,6 +72,8 @@ import { UsersModule } from './users/users.module';
     ConversationsModule,
 
     MessagesModule,
+
+    PromotionsModule,
   ],
   controllers: [],
   providers: [],

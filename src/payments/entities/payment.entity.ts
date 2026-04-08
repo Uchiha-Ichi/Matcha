@@ -1,9 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Booking } from '../../bookings/entities/booking.entity';
 
 export enum PaymentStatus {
-  PENDING = 'pending',
-  SUCCESS = 'success',
-  FAILED = 'failed',
+  UNPAID = 'unpaid',
+  PARTIALLY_PAID = 'partially_paid',
+  PAID = 'paid',
+  REFUNDED = 'refunded'
 }
 
 @Entity('payments')
@@ -11,9 +13,10 @@ export class Payment {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column()
-  booking_id!: number;
-
-  @Column({ type: 'enum', enum: PaymentStatus, default: PaymentStatus.PENDING })
+  @Column({ type: 'enum', enum: PaymentStatus, default: PaymentStatus.UNPAID })
   status!: PaymentStatus;
+
+  @ManyToOne(() => Booking, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'booking_id' })
+  booking!: Booking;
 }

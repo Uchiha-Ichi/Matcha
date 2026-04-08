@@ -1,25 +1,40 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { User } from '../../users/entities/user.entity';
+import { Booking } from '../../bookings/entities/booking.entity';
+
+export enum NotificationStatus {
+  UNREAD = 'unread',
+  READ = 'read'
+}
 
 @Entity('notifications')
 export class Notification {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ nullable: true })
-  booking_id!: number;
+  @Column({ length: 255, nullable: true })
+  name?: string;
 
-  @Column()
-  user_id!: number; // Đảm bảo not_null như thiết kế của bạn
+  @Column({ type: 'text', nullable: true })
+  description?: string;
 
-  @Column()
-  name!: string;
+  @Column({
+    type: 'enum',
+    enum: NotificationStatus,
+    default: NotificationStatus.UNREAD
+  })
+  status!: NotificationStatus;
 
-  @Column({ type: 'text' })
-  description!: string;
-
-  @Column({ default: false })
-  status!: boolean; // false: chưa đọc, true: đã đọc
-
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamp' })
   time!: Date;
+
+  // Quan hệ: Thông báo gửi tới một User cụ thể
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'user_id' })
+  user!: User;
+
+  // Quan hệ: Thông báo có thể liên quan đến một đơn đặt lịch (Booking)
+  @ManyToOne(() => Booking, { onDelete: 'CASCADE', nullable: true })
+  @JoinColumn({ name: 'booking_id' })
+  booking?: Booking;
 }

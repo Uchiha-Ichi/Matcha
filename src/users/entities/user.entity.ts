@@ -1,39 +1,44 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-
-export enum UserStatus {
-  ACTIVE = 'active',
-  INACTIVE = 'inactive',
-}
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToOne, OneToMany } from 'typeorm';
+import { Role } from '../../roles/entities/role.entity';
+import { Partner } from '../../partners/entities/partner.entity';
+import { Booking } from '../../bookings/entities/booking.entity';
 
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column()
+  @Column({ length: 255 })
   full_name!: string;
 
-  @Column({ unique: true })
+  @Column({ unique: true, length: 255 })
   email!: string;
 
-  @Column({ nullable: true })
-  phone!: string;
+  @Column({ unique: true, length: 20, nullable: true })
+  phone?: string;
 
-  @Column()
+  @Column({ length: 255 })
   password!: string;
 
-  @Column()
-  role_id!: number;
-
-  @Column({ type: 'enum', enum: UserStatus, default: UserStatus.ACTIVE })
-  status!: UserStatus;
+  @Column({ default: true })
+  is_active!: boolean;
 
   @Column({ nullable: true })
-  avatar_src!: string;
+  avatar_src?: string;
 
   @CreateDateColumn()
   created_at!: Date;
 
   @UpdateDateColumn()
-  update_at!: Date;
+  updated_at!: Date;
+
+  @ManyToOne(() => Role, (role) => role.users, { onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'role_id' })
+  role?: Role;
+
+  @OneToOne(() => Partner, (partner) => partner.user)
+  partner?: Partner;
+
+  @OneToMany(() => Booking, (booking) => booking.user)
+  bookings?: Booking[];
 }
