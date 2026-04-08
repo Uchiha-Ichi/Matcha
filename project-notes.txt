@@ -1,0 +1,364 @@
+═══════════════════════════════════════════════════════════════════
+              MATCHA BACKEND — GHI CHÚ DỰ ÁN TỔNG HỢP
+═══════════════════════════════════════════════════════════════════
+  Stack: NestJS + TypeORM + MySQL + Redis + Passport JWT + Pino
+  Cập nhật lần cuối: 2026-04-09
+═══════════════════════════════════════════════════════════════════
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[1] CẤU TRÚC THƯ MỤC
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+src/
+├── app.module.ts           ← Root module, cấu hình global
+├── main.ts                 ← Bootstrap, middleware toàn cục
+│
+├── auth/                   ← Xác thực (JWT + Google OAuth)
+│   ├── auth.module.ts
+│   ├── auth.service.ts
+│   ├── auth.controller.ts
+│   └── strategies/
+│       ├── jwt.strategy.ts
+│       └── google.strategy.ts
+│
+├── users/                  ← CRUD người dùng
+│   ├── users.module.ts
+│   ├── users.service.ts
+│   ├── users.controller.ts
+│   ├── dto/
+│   │   ├── create-user.dto.ts
+│   │   └── update-user.dto.ts
+│   └── entities/
+│       └── user.entity.ts
+│
+├── roles/                  ← Quản lý role (admin/user/partner...)
+│   └── entities/
+│       └── role.entity.ts
+│
+└── common/                 ← Dùng chung toàn app
+    ├── middleware/
+    │   └── logger.middleware.ts    ← Log mọi HTTP request
+    ├── guards/
+    │   ├── jwt-auth.guard.ts       ← Bảo vệ route (401)
+    │   └── roles.guard.ts          ← Phân quyền theo role (403)
+    └── decorators/
+        ├── roles.decorator.ts      ← @Roles('admin')
+        └── current-user.decorator.ts ← @CurrentUser()
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[2] MÔI TRƯỜNG — BIẾN .ENV CẦN CÓ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Server
+PORT=8000
+NODE_ENV=development
+
+# MySQL
+DB_HOST=localhost
+DB_PORT=3306
+DB_USERNAME=root
+DB_PASSWORD=yourpassword
+DB_DATABASE=matcha
+
+# JWT
+JWT_ACCESS_SECRET=your_access_secret_key
+JWT_REFRESH_SECRET=your_refresh_secret_key
+
+# Redis
+REDIS_URL=redis://localhost:6379
+
+# Google OAuth
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+
+# Frontend (CORS)
+FRONTEND_URL=http://localhost:3000
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[3] APP.MODULE — CÁC MODULE GLOBAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Thứ tự import trong AppModule (quan trọng):
+  1. ConfigModule.forRoot({ isGlobal: true })     ← đọc .env
+  2. LoggerModule.forRootAsync(...)                ← Pino logger
+  3. TypeOrmModule.forRootAsync(...)               ← kết nối MySQL
+  4. RedisModule.forRootAsync(...)                 ← kết nối Redis (global)
+  5. Các feature module (RolesModule, UsersModule, AuthModule...)
+
+AppModule implements NestModule → đăng ký LoggerMiddleware trên '*'
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[4] MAIN.TS — MIDDLEWARE TOÀN CỤC (THEO THỨ TỰ)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1. app.useLogger(pinoLogger)          ← Logger bằng Pino
+  2. app.use(helmet())                  ← Bảo mật HTTP headers
+  3. app.use(cookieParser())            ← Parse cookie (JWT dùng cookie)
+  4. app.enableCors({ ... })            ← Cho FE gọi API, credentials: true
+  5. app.setGlobalPrefix('api/v1')      ← Tất cả route: /api/v1/...
+  6. app.useGlobalPipes(ValidationPipe) ← Validate DTO tự động
+  7. app.useGlobalFilters(              ← Bắt tất cả exception, format lỗi chuẩn
+       new AllExceptionsFilter()
+     )
+
+Lưu ý import cookie-parser:
+  ✅ import cookieParser from 'cookie-parser';
+  ❌ import * as cookieParser from 'cookie-parser';  ← lỗi TS
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[5] ENTITIES — CẤU TRÚC BẢNG
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+User (bảng users):
+  id            number  PK, auto-increment
+  full_name     string  max 255
+  email         string  unique, max 255
+  phone         string  unique, nullable, max 20
+  password      string  nullable (Google user không có password)
+  google_id     string  unique, nullable (OAuth Google)
+  is_active     boolean default true
+  avatar_src    string  nullable
+  created_at    Date    auto
+  updated_at    Date    auto
+  role_id       FK → Role (SET NULL on delete)
+
+Role (bảng roles):
+  id            number  PK
+  name          string  max 50  (ví dụ: 'admin', 'user', 'partner')
+  description   string  nullable
+
+Quan hệ:
+  User -ManyToOne→ Role
+  User -OneToOne→ Partner
+  User -OneToMany→ Booking
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[6] AUTH MODULE — LUỒNG XÁC THỰC
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Providers trong AuthModule:
+  AuthService, JwtStrategy, GoogleStrategy
+  (PHẢI đăng ký strategies trong providers[], thiếu = lỗi runtime)
+
+Modules được import:
+  UsersModule, PassportModule, JwtModule
+  (ConfigModule và RedisModule đã global → không import lại)
+
+── Luồng đăng nhập Email ──────────────────────────────────────────
+  1. Controller nhận { email, password }
+  2. authService.signInEmail(email, password)
+      → findByEmail(email) [load kèm role relation]
+      → bcrypt.compare(password, user.password)
+      → trả { user, roles }   ← roles = [user.role.name]
+  3. authService.generateTokens(String(user.id), roles)
+      → accessToken:  JWT chứa { sub: userId, roles }  — hết hạn 15m
+      → refreshToken: JWT chứa { sub: userId }          — hết hạn 7d
+      → lưu hash của refreshToken vào Redis (key: refresh:{userId})
+  4. Set 2 tokens vào httpOnly cookie
+
+── Luồng Google OAuth ─────────────────────────────────────────────
+  1. GoogleStrategy.validate() lấy profile từ Google
+  2. authService.validateGoogleUser(profile)
+      → findByGoogleId(googleId)
+      → Nếu chưa có → createGoogleUser() (password = undefined)
+      → trả { user, roles }
+  3. generateTokens() như trên
+
+── Luồng Refresh Token ────────────────────────────────────────────
+  1. authService.refreshToken(oldRefreshToken)
+      → verify bằng JWT_REFRESH_SECRET
+      → lấy hash từ Redis, so sánh với hash của token gửi lên
+      → Khớp → generateTokens() mới
+      → Không khớp → 401 (token bị revoke)
+
+── Luồng Logout ───────────────────────────────────────────────────
+  1. authService.logout(userId)
+      → xoá key refresh:{userId} khỏi Redis
+      → Token cũ không dùng được nữa dù chưa hết hạn
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[7] USERS MODULE — CRUD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+UsersModule imports TypeOrmModule.forFeature([User])
+         exports UsersService (để AuthModule dùng)
+
+Methods trong UsersService:
+  create(dto)                → tạo user, hash password, bỏ password khỏi response
+  createUser(email, pw)      → helper cho AuthService (email signup)
+  createGoogleUser(profile)  → helper cho AuthService (Google OAuth)
+  findAll()                  → danh sách, kèm role, ẩn password
+  findOne(id)                → 1 user, kèm role, throw 404 nếu không có
+  findById(id)               → như findOne nhưng trả null (không throw)
+  findByEmail(email)         → tìm theo email, kèm role (null-safe)
+  findByGoogleId(googleId)   → tìm theo google_id, kèm role (null-safe)
+  update(id, dto)            → cập nhật, re-hash password nếu có đổi
+  remove(id)                 → hard delete
+  deactivate(id)             → tắt is_active (không xoá)
+
+Lưu ý quan trọng:
+  - findByEmail/findById/findByGoogleId PHẢI load relations: ['role']
+    vì AuthService cần role.name để nhúng vào JWT payload
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[8] GUARDS & DECORATORS — PHÂN QUYỀN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Thứ tự xử lý request:
+  Request → Middleware → Guard → Pipe → Controller
+
+── JwtAuthGuard ────────────────────────────────────────────────────
+  Hỏi: "Request này có JWT hợp lệ không?"
+  Cách dùng: @UseGuards(JwtAuthGuard)
+  Thất bại → 401 Unauthorized
+
+── RolesGuard ──────────────────────────────────────────────────────
+  Hỏi: "User này có role được phép không?"
+  Cách dùng: @UseGuards(JwtAuthGuard, RolesGuard)  ← thứ tự này bắt buộc
+  Thất bại → 403 Forbidden
+
+── @Roles('admin') ─────────────────────────────────────────────────
+  Khai báo role nào được phép vào route.
+  Không có @Roles() → RolesGuard cho qua (chỉ cần đăng nhập).
+
+── @CurrentUser() ──────────────────────────────────────────────────
+  Lấy user từ request sau khi JWT verify.
+  Trả về: { userId: number, roles: string[] }
+
+── Phân quyền UsersController ──────────────────────────────────────
+  POST   /api/v1/users       → @Roles('admin')
+  GET    /api/v1/users       → @Roles('admin')
+  GET    /api/v1/users/me    → mọi user đã login
+  GET    /api/v1/users/:id   → @Roles('admin')
+  PATCH  /api/v1/users/me    → mọi user đã login (không đổi được role)
+  PATCH  /api/v1/users/:id   → @Roles('admin')
+  DELETE /api/v1/users/:id   → @Roles('admin')
+
+── JwtStrategy.validate() ──────────────────────────────────────────
+  Trả về: { userId: payload.sub, roles: payload.roles ?? [] }
+  Object này được gắn vào request.user sau khi JwtAuthGuard chạy.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[9] MIDDLEWARE — LOGGER MIDDLEWARE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+File: src/common/middleware/logger.middleware.ts
+
+Log format:
+  GET /api/v1/users 200 — 45ms | IP: 127.0.0.1 | UA: Mozilla/5.0...
+
+Khác biệt Middleware vs Guard:
+  Middleware:  không biết route cụ thể, dùng để log/parse/rate-limit
+  Guard:       biết route, dùng để xác thực và phân quyền
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[10] EXCEPTION HANDLING — RESPONSE & STATUS CODE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Controller KHÔNG cần try-catch. NestJS tự xử lý qua:
+
+── 1. Status code mặc định theo decorator ────────────────────────
+  @Get()    → 200    @Post()   → 201
+  @Patch()  → 200    @Delete() → 200
+  Đổi bằng: @HttpCode(HttpStatus.OK) hoặc @HttpCode(201)
+
+  UsersController đang dùng:
+    @Post()   + @HttpCode(201) → tạo user
+    @Delete() + @HttpCode(200) → xóa user
+
+── 2. NestJS exceptions → HTTP status tự động ───────────────────
+  throw new NotFoundException()     → 404
+  throw new ConflictException()     → 409
+  throw new UnauthorizedException() → 401
+  throw new ForbiddenException()    → 403
+  Lỗi JS thường (DB, TypeError...) → 500
+    → Stack trace log phía server, không lộ ra client
+
+── 3. AllExceptionsFilter (Global) ──────────────────────────────
+  File: src/common/filters/all-exceptions.filter.ts
+
+  Response lỗi chuẩn trả về:
+  {
+    "statusCode": 404,
+    "message": "Không tìm thấy user #5",
+    "path": "/api/v1/users/5",
+    "timestamp": "2026-04-09T04:34:00.000Z"
+  }
+
+── 4. Kết luận ───────────────────────────────────────────────────
+  Controller: chỉ đọc request → gọi service → trả data
+  Service:    mới được throw exception (NotFoundException, ...)
+  Filter:     tự động bắt và format lỗi → code controller rất gọn
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[10] LOGGER — NESTJS-PINO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Packages: nestjs-pino, pino-http, pino-pretty (đã cài)
+
+Cấu hình trong AppModule:
+  NODE_ENV != 'production' → pino-pretty (màu, dễ đọc khi dev)
+  NODE_ENV == 'production' → JSON thuần (cho log aggregator)
+
+Cấu hình trong main.ts:
+  bufferLogs: true        ← không bỏ sót log trong lúc khởi động
+  app.useLogger(pinoLogger)
+
+Dùng trong Service:
+  constructor(private readonly logger: Logger) {}
+  this.logger.log('message');
+  this.logger.error('lỗi', error.stack);
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[11] LƯU Ý & CÁC LỖI HAY GẶP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+① synchronize: true → chỉ dùng khi dev, TẮT khi production
+
+② DB_PORT phải parseInt:
+   port: parseInt(configService.get<string>('DB_PORT') ?? '3306', 10)
+
+③ Strategies PHẢI trong providers[]:
+   providers: [AuthService, JwtStrategy, GoogleStrategy]
+
+④ RolesGuard phải đứng SAU JwtAuthGuard:
+   @UseGuards(JwtAuthGuard, RolesGuard)  ✅
+   @UseGuards(RolesGuard, JwtAuthGuard)  ❌
+
+⑤ findByEmail/findById/findByGoogleId phải load role relation
+   để AuthService lấy được role.name khi tạo JWT
+
+⑥ cookie-parser import phải dùng default import:
+   import cookieParser from 'cookie-parser';    ✅
+   import * as cookieParser from 'cookie-parser' ❌
+
+⑦ RedisModule và ConfigModule chỉ khai báo 1 lần ở AppModule
+   (isGlobal / global) — không import lại ở module con
+
+⑧ Google user không có password → password nullable trong entity
+   → signInEmail phải check: if (!user.password) → unauthorized
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[12] VIỆC CÒN LẠI / TODO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  [ ] Viết AuthController (login, signup, refresh, logout, google callback)
+  [ ] Viết Google OAuth callback route
+  [ ] Implement @Public() decorator cho route không cần auth
+  [ ] CRUD cho các module còn lại (bookings, partners, concepts...)
+  [ ] Tắt synchronize: true, dùng migration khi production
+  [ ] Thêm rate limiting (throttler) để chống brute force
+
+═══════════════════════════════════════════════════════════════════
