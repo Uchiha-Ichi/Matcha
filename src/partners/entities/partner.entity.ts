@@ -14,7 +14,7 @@ export class Partner {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
-  @Column({ type: 'point' }) 
+  @Column({ type: 'point' })
   location_gps!: string;
 
   @Column({ default: true })
@@ -25,6 +25,12 @@ export class Partner {
 
   @Column({ nullable: true })
   location_name?: string;
+
+  @Column({ type: 'decimal', precision: 3, scale: 2, default: 0 })
+  rating_avg: number;
+
+  @Column({ type: 'int', default: 0 })
+  rating_count!: number;
 
   @OneToOne(() => User, (user) => user.partner, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })

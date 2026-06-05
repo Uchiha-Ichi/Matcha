@@ -11,6 +11,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { PaymentsModule } from './payments/payments.module';
 import { BookingDetailsModule } from './booking-details/booking-details.module';
 import { BookingsModule } from './bookings/bookings.module';
+import { CartsModule } from './carts/carts.module';
 import { DateBlocksModule } from './date-blocks/date-blocks.module';
 import { PartnerConceptsModule } from './partner-concepts/partner-concepts.module';
 import { ConceptsModule } from './concepts/concepts.module';
@@ -19,13 +20,18 @@ import { CategoriesModule } from './categories/categories.module';
 import { UsersModule } from './users/users.module';
 import { PromotionsModule } from './promotions/promotions.module';
 import { AuthModule } from './auth/auth.module';
+import { ImageModule } from './image/image.module';
+import { StatisticsModule } from './statistics/statistics.module';
+import { ChatModule } from './chat/chat.module';
+import { AiModule } from './ai/ai.module';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
+
 
 @Module({
   imports: [
     // 1. Khởi tạo ConfigModule để đọc file .env
     ConfigModule.forRoot({
-      isGlobal: true, 
+      isGlobal: true,
     }),
 
     // 2. Cấu hình Logger (nestjs-pino) — pretty khi dev, JSON khi production
@@ -40,14 +46,14 @@ import { LoggerMiddleware } from './common/middleware/logger.middleware';
             transport: isProduction
               ? undefined
               : {
-                  target: 'pino-pretty',
-                  options: {
-                    colorize: true,
-                    singleLine: true,
-                    translateTime: 'SYS:yyyy-mm-dd HH:MM:ss',
-                    ignore: 'pid,hostname',
-                  },
+                target: 'pino-pretty',
+                options: {
+                  colorize: true,
+                  singleLine: true,
+                  translateTime: 'SYS:yyyy-mm-dd HH:MM:ss',
+                  ignore: 'pid,hostname',
                 },
+              },
           },
         };
       },
@@ -100,6 +106,8 @@ import { LoggerMiddleware } from './common/middleware/logger.middleware';
 
     BookingsModule,
 
+    CartsModule,
+
     BookingDetailsModule,
 
     PaymentsModule,
@@ -115,6 +123,14 @@ import { LoggerMiddleware } from './common/middleware/logger.middleware';
     PromotionsModule,
 
     AuthModule,
+
+    ImageModule,
+
+    StatisticsModule,
+
+    ChatModule,
+
+    AiModule,
   ],
   controllers: [],
   providers: [],

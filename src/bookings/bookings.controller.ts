@@ -1,34 +1,64 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
+import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
 
 @Controller('bookings')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class BookingsController {
   constructor(private readonly bookingsService: BookingsService) {}
 
   @Post()
-  create(@Body() createBookingDto: CreateBookingDto) {
-    return this.bookingsService.create(createBookingDto);
+  async create(
+    @CurrentUser() currentUser: { userId: number; roles: string[] },
+    @Body() createBookingDto: CreateBookingDto,
+  ) {
+    return this.bookingsService.create(currentUser.userId, createBookingDto);
   }
 
   @Get()
-  findAll() {
-    return this.bookingsService.findAll();
+  async findAll(@CurrentUser() currentUser: { userId: number; roles: string[] }) {
+    return this.bookingsService.findAll(currentUser.userId, currentUser.roles);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.bookingsService.findOne(+id);
+  async findOne(
+    @CurrentUser() currentUser: { userId: number; roles: string[] },
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.bookingsService.findOne(id, currentUser.userId, currentUser.roles);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateBookingDto: UpdateBookingDto) {
-    return this.bookingsService.update(+id, updateBookingDto);
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateBookingDto: UpdateBookingDto,
+  ) {
+    return this.bookingsService.update(id, updateBookingDto);
+  }
+
+  @Patch(':id/status')
+  @Roles('admin', 'partner')
+  async updateStatus(
+    @CurrentUser() currentUser: { userId: number; roles: string[] },
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateBookingStatusDto: UpdateBookingStatusDto,
+  ) {
+    return this.bookingsService.updateStatus(
+      id,
+      currentUser.userId,
+      currentUser.roles,
+      updateBookingStatusDto.status,
+    );
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.bookingsService.remove(+id);
+  async remove(@Param('id', ParseIntPipe) id: number) {
+    return this.bookingsService.remove(id);
   }
 }

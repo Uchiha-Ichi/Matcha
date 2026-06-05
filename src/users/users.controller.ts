@@ -70,20 +70,6 @@ export class UsersController {
   }
 
   /**
-   * PATCH /users/:id — Cập nhật user theo id
-   * Admin cập nhật bất kỳ user nào.
-   */
-  @Patch(':id')
-  @Roles('admin')
-  async update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() updateUserDto: UpdateUserDto,
-  ) {
-    const user = await this.usersService.update(id, updateUserDto);
-    return user;
-  }
-
-  /**
    * PATCH /users/me — User tự cập nhật thông tin của mình
    * Mọi user đã login đều dùng được.
    */
@@ -95,6 +81,20 @@ export class UsersController {
     // Không cho tự đổi role
     const { role_id, is_active, ...safeDto } = updateUserDto;
     const user = await this.usersService.update(currentUser.userId, safeDto);
+    return user;
+  }
+
+  /**
+   * PATCH /users/:id — Cập nhật user theo id
+   * Admin cập nhật bất kỳ user nào.
+   */
+  @Patch(':id')
+  @Roles('admin')
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateUserDto: UpdateUserDto,
+  ) {
+    const user = await this.usersService.update(id, updateUserDto);
     return user;
   }
 

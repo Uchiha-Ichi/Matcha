@@ -10,6 +10,9 @@ export class BookingDetail {
   @Column({ type: 'decimal', precision: 15, scale: 2 })
   price!: number;
 
+  @Column({ type: 'int', default: 1 })
+  quantity!: number;
+
   @ManyToOne(() => Booking, (b) => b.details, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'booking_id' })
   booking!: Booking;

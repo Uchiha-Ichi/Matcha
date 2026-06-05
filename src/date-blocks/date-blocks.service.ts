@@ -1,26 +1,33 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateDateBlockDto } from './dto/create-date-block.dto';
 import { UpdateDateBlockDto } from './dto/update-date-block.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { DateBlock } from './entities/date-block.entity';
 
 @Injectable()
 export class DateBlocksService {
+  constructor(
+    @InjectRepository(DateBlock)
+    private readonly dateBlocksRepository: Repository<DateBlock>,
+  ) { }
   create(createDateBlockDto: CreateDateBlockDto) {
-    return 'This action adds a new dateBlock';
+    return this.dateBlocksRepository.save(createDateBlockDto);
   }
 
   findAll() {
-    return `This action returns all dateBlocks`;
+    return this.dateBlocksRepository.find();
   }
 
   findOne(id: number) {
-    return `This action returns a #${id} dateBlock`;
+    return this.dateBlocksRepository.findOne({ where: { id } });
   }
 
   update(id: number, updateDateBlockDto: UpdateDateBlockDto) {
-    return `This action updates a #${id} dateBlock`;
+    return this.dateBlocksRepository.update(id, updateDateBlockDto);
   }
 
   remove(id: number) {
-    return `This action removes a #${id} dateBlock`;
+    return this.dateBlocksRepository.delete(id);
   }
 }

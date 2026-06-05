@@ -3,6 +3,7 @@ import { User } from '../../users/entities/user.entity';
 import { Partner } from '../../partners/entities/partner.entity';
 import { Promotion } from '../../promotions/entities/promotion.entity';
 import { BookingDetail } from '../../booking-details/entities/booking-detail.entity';
+import { Payment } from '../../payments/entities/payment.entity';
 
 export enum BookingStatus {
   PENDING = 'pending',
@@ -28,6 +29,9 @@ export class Booking {
   @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true })
   remaining_amount?: number;
 
+  @Column({ length: 255, nullable: true })
+  result_link?: string;
+
   @Column({ type: 'datetime' })
   booking_time!: Date;
 
@@ -51,4 +55,7 @@ export class Booking {
 
   @OneToMany(() => BookingDetail, (bd) => bd.booking)
   details?: BookingDetail[];
+
+  @OneToMany(() => Payment, (payment) => payment.booking)
+  payments?: Payment[];
 }

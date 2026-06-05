@@ -16,7 +16,7 @@ import { ROLES_KEY } from '../decorators/roles.decorator';
  */
 @Injectable()
 export class RolesGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+  constructor(private reflector: Reflector) { }
 
   canActivate(context: ExecutionContext): boolean {
     // Lấy danh sách role được phép từ metadata của route hoặc class
@@ -33,9 +33,9 @@ export class RolesGuard implements CanActivate {
     const { user } = context.switchToHttp().getRequest();
 
     // user.roles là mảng string từ JWT payload (ví dụ: ['admin', 'user'])
-    const userRoles: string[] = user?.roles ?? [];
+    const userRoles: string[] = user?.roles?.map((role: string) => role.toLowerCase()) ?? [];
 
-    const hasRole = requiredRoles.some((role) => userRoles.includes(role));
+    const hasRole = requiredRoles.some((role) => userRoles.includes(role.toLowerCase()));
 
     if (!hasRole) {
       throw new ForbiddenException(

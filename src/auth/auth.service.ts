@@ -11,6 +11,7 @@ import { InjectRedis } from "@nestjs-modules/ioredis";
 import { Redis } from "ioredis";
 import { UsersService } from "../users/users.service";
 import * as crypto from "crypto";
+import { CreateUserDto } from "../users/dto/create-user.dto";
 @Injectable()
 export class AuthService {
     constructor(

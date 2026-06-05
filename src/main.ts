@@ -24,7 +24,11 @@ async function bootstrap() {
   // ── 4. CORS ───────────────────────────────────────────────────────────────
   // Cho phép frontend (Next.js) gọi API — chỉ nhận request từ origin được khai báo
   app.enableCors({
-    origin: process.env.FRONTEND_URL ?? 'http://localhost:5174',
+    origin: [
+      process.env.FRONTEND_URL ?? 'http://localhost:5173',
+      'http://localhost:5173',
+      'http://localhost:5174',
+    ],
     credentials: true,         // Bắt buộc true khi dùng cookie
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

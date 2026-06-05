@@ -15,6 +15,9 @@ export class Concept {
   @Column({ default: true })
   is_active!: boolean;
 
+  @Column({ nullable: true })
+  image?: string;
+
   @OneToMany(() => PartnerConcept, (pc) => pc.concept)
   partner_concepts?: PartnerConcept[];
 }

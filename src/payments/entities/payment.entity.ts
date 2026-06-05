@@ -16,6 +16,9 @@ export class Payment {
   @Column({ type: 'enum', enum: PaymentStatus, default: PaymentStatus.UNPAID })
   status!: PaymentStatus;
 
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  amount_paid!: number;
+
   @ManyToOne(() => Booking, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'booking_id' })
   booking!: Booking;
