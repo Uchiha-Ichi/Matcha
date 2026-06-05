@@ -27,10 +27,6 @@ export class CreateUserDto {
   @MinLength(6)
   password!: string;
 
-  @IsOptional()
-  @IsString()
-  avatar_src?: string;
-
   /** ID của role (nếu muốn gán role khi tạo) */
   @IsOptional()
   role_id?: number;

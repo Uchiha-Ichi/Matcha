@@ -12,7 +12,16 @@ export class DateBlocksService {
     private readonly dateBlocksRepository: Repository<DateBlock>,
   ) { }
   create(createDateBlockDto: CreateDateBlockDto) {
-    return this.dateBlocksRepository.save(createDateBlockDto);
+    const entity: any = {
+      date_block: new Date(createDateBlockDto.date_block),
+    };
+    // Support { partner: { id: N } } or { partner_id: N }
+    if (createDateBlockDto.partner?.id) {
+      entity.partner = { id: createDateBlockDto.partner.id };
+    } else if (createDateBlockDto.partner_id) {
+      entity.partner = { id: createDateBlockDto.partner_id };
+    }
+    return this.dateBlocksRepository.save(entity);
   }
 
   findAll() {

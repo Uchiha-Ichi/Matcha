@@ -35,13 +35,12 @@ export class AuthService {
         return { user, roles };
     }
 
-    async signUpEmail(email: string, password: string) {
-        const existingUser = await this.usersService.findByEmail(email);
+    async signUpEmail(createUserDto: CreateUserDto) {
+        const existingUser = await this.usersService.findByEmail(createUserDto.email);
         if (existingUser) {
             throw new BadRequestException("Email already in use");
         }
-        const hashedPassword = await bcrypt.hash(password, 10);
-        return this.usersService.createUser(email, hashedPassword);
+        return this.usersService.create(createUserDto)
     }
 
     async signInEmail(email: string, password: string) {

@@ -17,7 +17,7 @@ export class PartnersController {
     private readonly imageService: ImageService
   ) { }
   @Post()
-  @Roles('admin')
+  @Roles('admin', 'partner')
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() createPartnerDto: CreatePartnerDto) {
     const partner = await this.partnersService.create(createPartnerDto);
@@ -37,6 +37,19 @@ export class PartnersController {
       searchNearbyDto.longitude,
       searchNearbyDto.radius_km,
     );
+  }
+
+  @Get('me')
+  @Roles('partner', 'admin', 'customer')
+  async findMe(
+    @CurrentUser() currentUser: { userId: number; roles: string[] },
+  ) {
+    const partners = await this.partnersService.findAll();
+    const mine = partners.find((p: any) => p.user?.id === currentUser.userId || (p as any).user_id === currentUser.userId);
+    if (!mine) {
+      return null;
+    }
+    return mine;
   }
 
   @Get(':id')

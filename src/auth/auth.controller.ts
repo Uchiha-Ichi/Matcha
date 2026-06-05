@@ -13,8 +13,17 @@ import type { Response, Request } from 'express';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
-class SignUpDto {
+import { IsEmail, IsNotEmpty, IsString, MinLength, IsInt, IsIn } from 'class-validator';
+import { CreateUserDto } from '../users/dto/create-user.dto';
+class SignUpDto implements CreateUserDto {
+
+  @IsString()
+  @IsNotEmpty({ message: 'Họ tên không được để trống' })
+  full_name!: string;
+
+  @IsString()
+  phone?: string;
+
   @IsEmail({}, { message: 'Email không đúng định dạng' })
   @IsNotEmpty({ message: 'Email không được để trống' })
   email!: string;
@@ -23,7 +32,12 @@ class SignUpDto {
   @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
   @MinLength(6, { message: 'Mật khẩu phải ít nhất 6 ký tự' })
   password!: string;
+
+  @IsInt({ message: 'Vai trò phải là một số nguyên' })
+  // @IsIn([1, 2], { message: 'Vai trò không hợp lệ. Chỉ chấp nhận 1 (Khách hàng) hoặc 2 (Đối tác)' })
+  role_id?: number;
 }
+
 
 class SignInDto {
   @IsEmail({}, { message: 'Email không đúng định dạng' })
@@ -50,7 +64,7 @@ export class AuthController {
   @Post('signup')
   @HttpCode(HttpStatus.CREATED)
   async signUp(@Body() dto: SignUpDto, @Res({ passthrough: true }) res: Response) {
-    const user = await this.authService.signUpEmail(dto.email, dto.password);
+    const user = await this.authService.signUpEmail(dto);
     const { accessToken, refreshToken } = await this.authService.generateTokens(
       String(user.id),
       [], // user mới chưa có role

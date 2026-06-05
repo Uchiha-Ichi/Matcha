@@ -16,7 +16,19 @@ export class PartnerConceptsService {
   ) { }
 
   async create(createPartnerConceptDto: CreatePartnerConceptDto) {
-    const saved = await this.partnerConceptsRepository.save(createPartnerConceptDto);
+    // Map partner_id and concept_id to proper relation objects
+    const entity: any = {
+      price: createPartnerConceptDto.price,
+      time: createPartnerConceptDto.time,
+      image_des: createPartnerConceptDto.image_des,
+    };
+    if ((createPartnerConceptDto as any).partner_id) {
+      entity.partner = { id: Number((createPartnerConceptDto as any).partner_id) };
+    }
+    if ((createPartnerConceptDto as any).concept_id) {
+      entity.concept = { id: Number((createPartnerConceptDto as any).concept_id) };
+    }
+    const saved = await this.partnerConceptsRepository.save(entity);
     if (createPartnerConceptDto.image_des) {
       await this.imageService.createImage(ImageTargetType.PARTNER_CONCEPT, saved.id, createPartnerConceptDto.image_des, true);
     }

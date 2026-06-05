@@ -33,6 +33,7 @@ export class UsersService {
     const user = this.usersRepository.create({
       ...dto,
       password: hashed,
+      // role: { id: 1 } as any,
       role: dto.role_id ? ({ id: dto.role_id } as any) : undefined,
     });
 
@@ -47,7 +48,7 @@ export class UsersService {
       email,
       password: hashedPassword,
       full_name: email.split('@')[0],
-      role: { id: 3 } as any,
+      role: { id: 1 } as any,
     });
     return this.usersRepository.save(user);
   }

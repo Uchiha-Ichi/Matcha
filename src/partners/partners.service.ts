@@ -37,7 +37,7 @@ export class PartnersService {
   }
 
   async findAll() {
-    const partners = await this.partnersRepository.find();
+    const partners = await this.partnersRepository.find({ relations: ['user', 'category'] });
     if (!partners) {
       throw new NotFoundException(`Không tìm thấy partner`);
     }
