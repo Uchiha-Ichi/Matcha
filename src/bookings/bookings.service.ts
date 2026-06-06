@@ -8,7 +8,7 @@ import { User } from '../users/entities/user.entity';
 import { Partner } from '../partners/entities/partner.entity';
 import { Promotion } from '../promotions/entities/promotion.entity';
 import { PartnerConcept } from '../partner-concepts/entities/partner-concept.entity';
-import { Payment, PaymentStatus } from '../payments/entities/payment.entity';
+import { Payment, PaymentProvider, PaymentStatus, PaymentType } from '../payments/entities/payment.entity';
 import { DateBlock } from '../date-blocks/entities/date-block.entity';
 
 @Injectable()
@@ -140,6 +140,7 @@ export class BookingsService {
         price_deposit: depositAmount,
         remaining_amount: netPrice,
         booking_time: new Date(booking_time),
+        status: BookingStatus.PENDING,
       });
 
       const savedBooking = await bookingsRepository.save(booking);
@@ -160,6 +161,8 @@ export class BookingsService {
       const paymentRepository = manager.getRepository(Payment);
       const payment = paymentRepository.create({
         booking: savedBooking,
+        provider: PaymentProvider.PAYOS,
+        payment_type: PaymentType.DEPOSIT,
         status: PaymentStatus.UNPAID,
       });
       await paymentRepository.save(payment);

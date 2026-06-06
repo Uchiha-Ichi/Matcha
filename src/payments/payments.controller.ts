@@ -1,10 +1,25 @@
-import { Controller, Get, Post, Body, Param, Delete, UseGuards, ParseIntPipe, HttpCode, HttpStatus, Req, Res, Query } from '@nestjs/common';
-import { PaymentsService } from './payments.service';
-import { ProcessPaymentDto } from './dto/process-payment.dto';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
+import * as express from 'express';
+import { Roles } from '../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
-import * as express from 'express';
+import { CreatePaymentDto } from './dto/create-payment.dto';
+import { ProcessPaymentDto } from './dto/process-payment.dto';
+import { PaymentType } from './entities/payment.entity';
+import { PaymentsService } from './payments.service';
 
 @Controller('payments')
 export class PaymentsController {
@@ -13,44 +28,66 @@ export class PaymentsController {
   @Post('create-url')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  async createPaymentUrl(
-    @Body('booking_id', ParseIntPipe) bookingId: number,
-    @Body('payment_type') paymentType: 'deposit' | 'full',
-    @Req() req: express.Request,
-  ) {
-    const ipAddress = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
-    const cleanIp = ipAddress.split(',')[0].trim();
-    
-    const url = await this.paymentsService.createPaymentUrl(bookingId, paymentType, cleanIp);
-    return { url };
+  async createPaymentUrl(@Body() dto: CreatePaymentDto) {
+    const result = await this.paymentsService.createPaymentUrl(dto.booking_id, dto.payment_type);
+    return {
+      url: result.checkoutUrl,
+      checkoutUrl: result.checkoutUrl,
+      qrCode: result.qrCode,
+      orderCode: result.orderCode,
+      paymentLinkId: result.paymentLinkId,
+      amount: result.amount,
+      status: result.status,
+      payment: result.payment,
+    };
   }
 
   @Get('test-url/:bookingId')
   @HttpCode(HttpStatus.OK)
   async testUrl(
     @Param('bookingId', ParseIntPipe) bookingId: number,
-    @Query('type') paymentType: 'deposit' | 'full',
+    @Query('type') paymentType: PaymentType,
   ) {
-    const url = await this.paymentsService.createPaymentUrl(bookingId, paymentType || 'deposit', '127.0.0.1');
-    return { url };
+    return await this.paymentsService.createPaymentUrl(bookingId, paymentType || PaymentType.DEPOSIT);
   }
 
-  @Get('vnpay-return')
+  @Get('payos-return')
   @HttpCode(HttpStatus.FOUND)
-  async vnpayReturn(@Query() query: any, @Res() res: express.Response) {
-    const result = await this.paymentsService.verifyVnpayPayment(query);
+  async payosReturn(@Query() query: any, @Res() res: express.Response) {
+    const result = await this.paymentsService.handlePayosReturn(query);
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    if (result.success) {
-      res.redirect(`${frontendUrl}/bookings/${result.bookingId}?paymentStatus=success`);
-    } else {
-      res.redirect(`${frontendUrl}/bookings/${result.bookingId}?paymentStatus=fail&message=${encodeURIComponent(result.message)}`);
+    const bookingId = result.bookingId;
+    const status = result.success ? 'success' : 'fail';
+    const message = encodeURIComponent(result.message);
+
+    if (bookingId) {
+      res.redirect(`${frontendUrl}/bookings/${bookingId}?paymentStatus=${status}&message=${message}`);
+      return;
     }
+
+    res.redirect(`${frontendUrl}/order-history?paymentStatus=${status}&message=${message}`);
   }
 
-  @Get('vnpay-ipn')
+  @Post('payos-webhook')
   @HttpCode(HttpStatus.OK)
-  async vnpayIpn(@Query() query: any) {
-    return await this.paymentsService.processVnpayIpn(query);
+  async payosWebhook(@Body() body: any) {
+    await this.paymentsService.handlePayosWebhook(body);
+    return { success: true };
+  }
+
+  @Post('close-qr')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async closeQr(
+    @Body('payment_id') paymentId?: number,
+    @Body('payment_link_id') paymentLinkId?: string,
+    @Body('order_code') orderCode?: string,
+  ) {
+    return this.paymentsService.removeTemporaryPayment({
+      paymentId: paymentId ? Number(paymentId) : undefined,
+      paymentLinkId,
+      orderCode,
+    });
   }
 
   @Post('process')
