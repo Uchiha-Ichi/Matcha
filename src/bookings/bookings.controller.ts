@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, ParseIntPipe, Query } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
@@ -22,8 +22,11 @@ export class BookingsController {
   }
 
   @Get()
-  async findAll(@CurrentUser() currentUser: { userId: number; roles: string[] }) {
-    return this.bookingsService.findAll(currentUser.userId, currentUser.roles);
+  async findAll(
+    @CurrentUser() currentUser: { userId: number; roles: string[] },
+    @Query('role') role?: string,
+  ) {
+    return this.bookingsService.findAll(currentUser.userId, currentUser.roles, role);
   }
 
   @Get(':id')
@@ -43,7 +46,7 @@ export class BookingsController {
   }
 
   @Patch(':id/status')
-  @Roles('admin', 'partner')
+  @Roles('admin', 'partner', 'customer')
   async updateStatus(
     @CurrentUser() currentUser: { userId: number; roles: string[] },
     @Param('id', ParseIntPipe) id: number,
@@ -55,6 +58,15 @@ export class BookingsController {
       currentUser.roles,
       updateBookingStatusDto.status,
     );
+  }
+
+  @Patch(':id/apply-promotion')
+  async applyPromotion(
+    @CurrentUser() currentUser: { userId: number; roles: string[] },
+    @Param('id', ParseIntPipe) id: number,
+    @Body('code') code: string,
+  ) {
+    return this.bookingsService.applyPromotion(id, currentUser.userId, code);
   }
 
   @Delete(':id')

@@ -27,14 +27,36 @@ export class ChatService {
   /**
    * Tạo hoặc lấy lại conversation giữa user và partner
    */
-  async getOrCreateConversation(userId: number, dto: CreateConversationDto): Promise<Conversation> {
-    const { partner_id, booking_id } = dto;
+  async getOrCreateConversation(userId: number, roles: string[], dto: CreateConversationDto): Promise<Conversation> {
+    const { partner_id, user_id, booking_id } = dto;
+
+    let targetUserId = userId;
+    let targetPartnerId = partner_id;
+
+    if (roles.includes('partner')) {
+      const partner = await this.partnerRepo.findOne({
+        where: { user: { id: userId } },
+      });
+      if (!partner) {
+        throw new NotFoundException(`Không tìm thấy thông tin đối tác của bạn`);
+      }
+      targetPartnerId = partner.id;
+
+      if (!user_id) {
+        throw new NotFoundException(`Thiếu thông tin khách hàng cần nhắn tin`);
+      }
+      targetUserId = user_id;
+    } else {
+      if (!targetPartnerId) {
+        throw new NotFoundException(`Thiếu thông tin đối tác cần nhắn tin`);
+      }
+    }
 
     // Tìm conversation đã tồn tại
     const existing = await this.conversationRepo.findOne({
       where: {
-        user: { id: userId },
-        partner: { id: partner_id },
+        user: { id: targetUserId },
+        partner: { id: targetPartnerId },
         ...(booking_id ? { booking: { id: booking_id } } : {}),
       },
       relations: ['user', 'partner', 'booking'],
@@ -42,11 +64,11 @@ export class ChatService {
 
     if (existing) return existing;
 
-    const user = await this.userRepo.findOne({ where: { id: userId } });
-    if (!user) throw new NotFoundException(`Không tìm thấy user #${userId}`);
+    const user = await this.userRepo.findOne({ where: { id: targetUserId } });
+    if (!user) throw new NotFoundException(`Không tìm thấy khách hàng #${targetUserId}`);
 
-    const partner = await this.partnerRepo.findOne({ where: { id: partner_id } });
-    if (!partner) throw new NotFoundException(`Không tìm thấy partner #${partner_id}`);
+    const partner = await this.partnerRepo.findOne({ where: { id: targetPartnerId } });
+    if (!partner) throw new NotFoundException(`Không tìm thấy đối tác #${targetPartnerId}`);
 
     let booking: Booking | undefined = undefined;
     if (booking_id) {
@@ -85,12 +107,16 @@ export class ChatService {
    * Lấy tin nhắn trong conversation (có phân trang)
    */
   async getMessages(conversationId: number, page = 1, limit = 30): Promise<Message[]> {
-    return this.messageRepo.find({
+    const messages = await this.messageRepo.find({
       where: { conversation: { id: conversationId } },
       relations: ['user', 'reply_to'],
       order: { created_at: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
+    });
+    return messages.map(msg => {
+      (msg as any).conversation_id = conversationId;
+      return msg;
     });
   }
 
@@ -127,10 +153,14 @@ export class ChatService {
     conversation.last_message = content;
     await this.conversationRepo.save(conversation);
 
-    return this.messageRepo.findOne({
+    const msg = await this.messageRepo.findOne({
       where: { id: saved.id },
       relations: ['user', 'reply_to'],
-    }) as Promise<Message>;
+    });
+    if (msg) {
+      (msg as any).conversation_id = conversation_id;
+    }
+    return msg as Message;
   }
 
   /**

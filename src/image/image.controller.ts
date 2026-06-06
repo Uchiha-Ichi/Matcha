@@ -1,7 +1,8 @@
-import { Controller, Post, UseInterceptors, UploadedFile, UploadedFiles, UseGuards, BadRequestException, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Delete, Patch, Param, Body, UseInterceptors, UploadedFile, UploadedFiles, UseGuards, BadRequestException, HttpCode, HttpStatus } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { ImageService } from './image.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { ImageTargetType } from './entities/image.entity';
 
 @Controller('image')
 @UseGuards(JwtAuthGuard)
@@ -55,5 +56,39 @@ export class ImageController {
     const urls = await Promise.all(uploadPromises);
 
     return { urls };
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  async deleteImage(@Param('id') id: string) {
+    await this.imageService.deleteImage(+id);
+    return { success: true };
+  }
+
+  @Patch(':id/set-primary')
+  @HttpCode(HttpStatus.OK)
+  async setPrimaryImage(
+    @Param('id') id: string,
+    @Body('target_type') targetType: string,
+    @Body('target_id') targetId: string
+  ) {
+    await this.imageService.setPrimary(targetType as ImageTargetType, +targetId, +id);
+    return { success: true };
+  }
+
+  @Post('add-to-target')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FileInterceptor('file'))
+  async addImageToTarget(
+    @Body('target_type') targetType: string,
+    @Body('target_id') targetId: string,
+    @UploadedFile() file: Express.Multer.File
+  ) {
+    if (!file) {
+      throw new BadRequestException('Vui lòng chọn file để upload');
+    }
+    const url = await this.imageService.uploadFile(file);
+    const image = await this.imageService.createImage(targetType as ImageTargetType, +targetId, url, false);
+    return image;
   }
 }

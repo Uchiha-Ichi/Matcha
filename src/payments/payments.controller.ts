@@ -10,6 +10,17 @@ import * as express from 'express';
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
+  /** Mô phỏng xác nhận thanh toán không qua VNPay (dùng cho demo/dev) */
+  @Post('mock-confirm')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async mockConfirm(
+    @Body('booking_id', ParseIntPipe) bookingId: number,
+    @Body('payment_type') paymentType: 'deposit' | 'full',
+  ) {
+    return this.paymentsService.mockConfirmPayment(bookingId, paymentType);
+  }
+
   @Post('create-url')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
@@ -25,15 +36,7 @@ export class PaymentsController {
     return { url };
   }
 
-  @Get('test-url/:bookingId')
-  @HttpCode(HttpStatus.OK)
-  async testUrl(
-    @Param('bookingId', ParseIntPipe) bookingId: number,
-    @Query('type') paymentType: 'deposit' | 'full',
-  ) {
-    const url = await this.paymentsService.createPaymentUrl(bookingId, paymentType || 'deposit', '127.0.0.1');
-    return { url };
-  }
+ 
 
   @Get('vnpay-return')
   @HttpCode(HttpStatus.FOUND)

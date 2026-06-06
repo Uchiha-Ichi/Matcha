@@ -56,6 +56,36 @@ export class PaymentsService {
     return paymentUrl;
   }
 
+  /** Xác nhận thanh toán trực tiếp không qua VNPay (dùng cho demo/dev) */
+  async mockConfirmPayment(bookingId: number, paymentType: 'deposit' | 'full'): Promise<{ payment: Payment; booking: Booking }> {
+    const booking = await this.dataSource.getRepository(Booking).findOne({ where: { id: bookingId } });
+    if (!booking) {
+      throw new NotFoundException(`Không tìm thấy đơn đặt lịch #${bookingId}`);
+    }
+
+    const netPrice = Number(booking.price) - Number(booking.price_discount);
+    const depositPrice = Number(booking.price_deposit);
+
+    // Tính số tiền cần thanh toán
+    let amountToPay: number;
+    if (paymentType === 'deposit') {
+      amountToPay = depositPrice;
+    } else {
+      // full payment: kiểm tra đã trả chưa
+      const existingPayment = await this.paymentsRepository.findOne({
+        where: { booking: { id: bookingId } },
+      });
+      const alreadyPaid = existingPayment ? Number(existingPayment.amount_paid ?? 0) : 0;
+      amountToPay = Math.max(0, netPrice - alreadyPaid);
+    }
+
+    if (amountToPay <= 0) {
+      throw new BadRequestException('Đơn hàng đã được thanh toán đầy đủ');
+    }
+
+    return this.processPayment({ booking_id: bookingId, amount_paid: amountToPay });
+  }
+
   async verifyVnpayPayment(query: any): Promise<{ success: boolean; message: string; bookingId?: number }> {
     try {
       const verify = await this.vnpayService.verifyReturnUrl(query);
