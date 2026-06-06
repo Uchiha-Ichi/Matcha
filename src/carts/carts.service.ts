@@ -13,7 +13,7 @@ import { User } from '../users/entities/user.entity';
 import { PartnerConcept } from '../partner-concepts/entities/partner-concept.entity';
 import { Booking, BookingStatus } from '../bookings/entities/booking.entity';
 import { BookingDetail } from '../booking-details/entities/booking-detail.entity';
-import { Payment, PaymentStatus } from '../payments/entities/payment.entity';
+import { Payment, PaymentProvider, PaymentStatus, PaymentType } from '../payments/entities/payment.entity';
 import { Promotion } from '../promotions/entities/promotion.entity';
 import { Partner } from '../partners/entities/partner.entity';
 
@@ -257,6 +257,8 @@ export class CartsService {
         // Tạo Payment ban đầu (UNPAID)
         const payment = paymentsRepo.create({
           booking: savedBooking,
+          provider: PaymentProvider.PAYOS,
+          payment_type: PaymentType.DEPOSIT,
           status: PaymentStatus.UNPAID,
         });
         await paymentsRepo.save(payment);
