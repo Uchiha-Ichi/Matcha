@@ -25,13 +25,26 @@ export class PartnersService {
   ) { }
 
   async create(createPartnerDto: CreatePartnerDto) {
-    const partner = await this.partnersRepository.findOne({ where: { user: { id: createPartnerDto.user_id } } });
-    if (partner) {
+    const existing = await this.partnersRepository.findOne({ where: { user: { id: createPartnerDto.user_id } } });
+    if (existing) {
       throw new NotFoundException(`Partner đã tồn tại #${createPartnerDto.user_id}`);
     }
-    const savedPartner = await this.partnersRepository.save(createPartnerDto);
-    if (createPartnerDto.cover_image) {
-      await this.imageService.createImage(ImageTargetType.PARTNER, savedPartner.id, createPartnerDto.cover_image, true);
+
+    const { user_id, categories_id, cover_image, location_gps, ...rest } = createPartnerDto;
+
+    const newPartner = this.partnersRepository.create({
+      ...rest,
+      location_gps: location_gps ?? 'POINT(105.8342 21.0245)',
+      user: { id: user_id } as any,
+      ...(categories_id ? { category: { id: categories_id } as any } : {}),
+    });
+
+    const savedPartner = await this.partnersRepository.save(newPartner);
+
+    if (cover_image) {
+      const savedImage = await this.imageService.createImage(ImageTargetType.PARTNER, savedPartner.id, cover_image, true);
+      savedPartner.cover_image = savedImage.image_src;
+      await this.partnersRepository.save(savedPartner);
     }
     return savedPartner;
   }
@@ -83,10 +96,23 @@ export class PartnersService {
     if (!partner) {
       throw new NotFoundException(`Không tìm thấy partner #${id}`);
     }
+    let imageUrl: string | undefined = undefined;
     if (updatePartnerDto.cover_image) {
-      await this.imageService.updatePrimaryImage(ImageTargetType.PARTNER, id, updatePartnerDto.cover_image);
+      const savedImage = await this.imageService.updatePrimaryImage(ImageTargetType.PARTNER, id, updatePartnerDto.cover_image);
+      imageUrl = savedImage.image_src;
     }
-    return await this.partnersRepository.update(id, updatePartnerDto);
+
+    // Tách user_id, categories_id ra khỏi payload trước khi update
+    const { user_id, categories_id, cover_image, ...safeDto } = updatePartnerDto as any;
+    const updatePayload: any = { ...safeDto };
+    if (categories_id) {
+      updatePayload.category = { id: categories_id };
+    }
+    if (imageUrl) {
+      updatePayload.cover_image = imageUrl;
+    }
+
+    return await this.partnersRepository.update(id, updatePayload);
   }
 
   async remove(id: number) {
@@ -182,8 +208,11 @@ export class PartnersService {
    * Partner chỉ được xem lịch của chính họ (controller kiểm tra quyền).
    */
   async getCalendar(partnerId: number): Promise<{
+    id?: number;
     date: string;
     type: 'blocked' | 'booked';
+    start_time?: string;
+    end_time?: string;
     booking_id?: number;
     booking_status?: string;
   }[]> {
@@ -205,19 +234,40 @@ export class PartnersService {
     const activeBookings = bookings.filter(b => b.status !== BookingStatus.CANCELLED);
 
     // 3. Gộp thành mảng CalendarEvent
-    const events: { date: string; type: 'blocked' | 'booked'; booking_id?: number; booking_status?: string }[] = [];
+    const events: {
+      id?: number;
+      date: string;
+      type: 'blocked' | 'booked';
+      start_time?: string;
+      end_time?: string;
+      booking_id?: number;
+      booking_status?: string;
+    }[] = [];
 
     for (const block of dateBlocks) {
+      const dateStr = typeof block.date_block === 'string'
+        ? block.date_block
+        : new Date(block.date_block).toISOString().split('T')[0];
       events.push({
-        date: new Date(block.date_block).toISOString().split('T')[0],
+        id: block.id,
+        date: dateStr,
         type: 'blocked',
+        start_time: block.start_time || undefined,
+        end_time: block.end_time || undefined,
       });
     }
 
     for (const booking of activeBookings) {
+      const dateObj = new Date(booking.booking_time);
+      const dateStr = dateObj.toISOString().split('T')[0];
+      const hours = String(dateObj.getHours()).padStart(2, '0');
+      const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+      const timeStr = `${hours}:${minutes}`;
+
       events.push({
-        date: new Date(booking.booking_time).toISOString().split('T')[0],
+        date: dateStr,
         type: 'booked',
+        start_time: timeStr,
         booking_id: booking.id,
         booking_status: booking.status,
       });

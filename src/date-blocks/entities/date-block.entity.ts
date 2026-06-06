@@ -6,8 +6,14 @@ export class DateBlock {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ type: 'datetime' })
-  date_block!: Date;
+  @Column({ type: 'date' })
+  date_block!: string;
+
+  @Column({ type: 'time', nullable: true })
+  start_time?: string;
+
+  @Column({ type: 'time', nullable: true })
+  end_time?: string;
 
   // Quan hệ: Nhiều ngày bị chặn thuộc về một Partner
   @ManyToOne(() => Partner, { onDelete: 'CASCADE' })

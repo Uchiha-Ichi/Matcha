@@ -22,9 +22,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: { sub: number; roles: string[] }) {
+  async validate(payload: { sub: any; roles: string[] }) {
     return {
-      userId: payload.sub,          // number — khớp với User.id
+      userId: Number(payload.sub),          // number — khớp với User.id
       roles: payload.roles ?? [],   // string[] — dùng cho RolesGuard
     };
   }

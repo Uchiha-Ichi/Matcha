@@ -13,7 +13,9 @@ export class DateBlocksService {
   ) { }
   create(createDateBlockDto: CreateDateBlockDto) {
     const entity: any = {
-      date_block: new Date(createDateBlockDto.date_block),
+      date_block: createDateBlockDto.date_block,
+      start_time: createDateBlockDto.start_time || undefined,
+      end_time: createDateBlockDto.end_time || undefined,
     };
     // Support { partner: { id: N } } or { partner_id: N }
     if (createDateBlockDto.partner?.id) {

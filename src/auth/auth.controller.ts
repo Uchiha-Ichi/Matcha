@@ -15,6 +15,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { IsEmail, IsNotEmpty, IsString, MinLength, IsInt, IsIn } from 'class-validator';
 import { CreateUserDto } from '../users/dto/create-user.dto';
+import { UsersService } from '../users/users.service';
 class SignUpDto implements CreateUserDto {
 
   @IsString()
@@ -56,7 +57,10 @@ const COOKIE_REFRESH_TTL = 7 * 24 * 60 * 60 * 1000; // 7 ngày
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(
+    private readonly authService: AuthService,
+    private readonly usersService: UsersService,
+  ) { }
 
   // ────────────────────────────────────────────────────────────────
   // POST /api/v1/auth/signup — Đăng ký bằng email
@@ -65,9 +69,12 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   async signUp(@Body() dto: SignUpDto, @Res({ passthrough: true }) res: Response) {
     const user = await this.authService.signUpEmail(dto);
+    const fullUser = await this.usersService.findOne(user.id);
+    const roles = fullUser.role ? [fullUser.role.name] : [];
+
     const { accessToken, refreshToken } = await this.authService.generateTokens(
       String(user.id),
-      [], // user mới chưa có role
+      roles,
     );
 
     this.setAuthCookies(res, accessToken, refreshToken);

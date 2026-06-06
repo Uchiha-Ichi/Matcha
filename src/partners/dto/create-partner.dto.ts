@@ -28,4 +28,8 @@ export class CreatePartnerDto {
     @IsNumber()
     @IsOptional()
     categories_id?: number;
+
+    @IsBoolean()
+    @IsOptional()
+    is_active?: boolean;
 }

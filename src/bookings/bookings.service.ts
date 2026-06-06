@@ -9,6 +9,7 @@ import { Partner } from '../partners/entities/partner.entity';
 import { Promotion } from '../promotions/entities/promotion.entity';
 import { PartnerConcept } from '../partner-concepts/entities/partner-concept.entity';
 import { Payment, PaymentStatus } from '../payments/entities/payment.entity';
+import { DateBlock } from '../date-blocks/entities/date-block.entity';
 
 @Injectable()
 export class BookingsService {
@@ -35,6 +36,34 @@ export class BookingsService {
       const partner = await partnersRepository.findOne({ where: { id: partner_id } });
       if (!partner) {
         throw new NotFoundException(`Không tìm thấy đối tác (Partner) #${partner_id}`);
+      }
+
+      // Check DateBlock conflicts
+      const requestedDate = new Date(booking_time);
+      const tzOptions = { timeZone: 'Asia/Ho_Chi_Minh' };
+      const dateString = requestedDate.toLocaleDateString('sv-SE', tzOptions);
+      const timeString = requestedDate.toLocaleTimeString('en-GB', tzOptions);
+
+      const dateBlocksRepository = manager.getRepository(DateBlock);
+      const blocksOnDate = await dateBlocksRepository.find({
+        where: {
+          partner: { id: partner_id },
+          date_block: dateString,
+        }
+      });
+
+      for (const block of blocksOnDate) {
+        // If whole-day block
+        if (!block.start_time || !block.end_time) {
+          throw new BadRequestException(`Đối tác đã chặn lịch vào ngày ${dateString}`);
+        }
+        
+        // If time-range block matches the requested time
+        if (timeString >= block.start_time && timeString <= block.end_time) {
+          throw new BadRequestException(
+            `Thời gian đặt lịch (${timeString.slice(0, 5)}) ngày ${dateString} nằm trong khung giờ đã bị chặn của đối tác (${block.start_time.slice(0, 5)} - ${block.end_time.slice(0, 5)})`
+          );
+        }
       }
 
       // 3. Verify PartnerConcepts

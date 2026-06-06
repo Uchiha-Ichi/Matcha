@@ -42,7 +42,24 @@ export class ImageService {
     });
   }
 
+  async uploadBase64(base64Str: string): Promise<string> {
+    try {
+      const result = await cloudinary.uploader.upload(base64Str, {
+        folder: 'matcha',
+        resource_type: 'image',
+      });
+      return result.secure_url;
+    } catch (error: any) {
+      throw new BadRequestException(`Upload ảnh thất bại: ${error.message}`);
+    }
+  }
+
   async createImage(targetType: ImageTargetType, targetId: number, imageSrc: string, isPrimary: boolean = false): Promise<Image> {
+    let finalSrc = imageSrc;
+    if (imageSrc && imageSrc.startsWith('data:image/')) {
+      finalSrc = await this.uploadBase64(imageSrc);
+    }
+
     if (isPrimary) {
       await this.imagesRepository.update(
         { target_type: targetType, target_id: targetId },
@@ -52,7 +69,7 @@ export class ImageService {
     const image = this.imagesRepository.create({
       target_type: targetType,
       target_id: targetId,
-      image_src: imageSrc,
+      image_src: finalSrc,
       is_primary: isPrimary ? 1 : 0,
     });
     return await this.imagesRepository.save(image);
@@ -72,12 +89,17 @@ export class ImageService {
   }
 
   async updatePrimaryImage(targetType: ImageTargetType, targetId: number, imageSrc: string): Promise<Image> {
+    let finalSrc = imageSrc;
+    if (imageSrc && imageSrc.startsWith('data:image/')) {
+      finalSrc = await this.uploadBase64(imageSrc);
+    }
+
     const existingPrimary = await this.getPrimaryImageForTarget(targetType, targetId);
     if (existingPrimary) {
-      existingPrimary.image_src = imageSrc;
+      existingPrimary.image_src = finalSrc;
       return await this.imagesRepository.save(existingPrimary);
     } else {
-      return await this.createImage(targetType, targetId, imageSrc, true);
+      return await this.createImage(targetType, targetId, finalSrc, true);
     }
   }
 
