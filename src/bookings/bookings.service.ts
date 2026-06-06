@@ -172,8 +172,9 @@ export class BookingsService {
     });
   }
 
-  async findAll(userId: number, roles: string[]): Promise<Booking[]> {
+  async findAll(userId: number, roles: string[], roleFilter?: string): Promise<Booking[]> {
     const query = this.dataSource.getRepository(Booking).createQueryBuilder('booking')
+      .leftJoinAndSelect('booking.user', 'user')
       .leftJoinAndSelect('booking.partner', 'partner')
       .leftJoinAndSelect('booking.promotion', 'promotion')
       .leftJoinAndSelect('booking.payments', 'payments')
@@ -182,7 +183,11 @@ export class BookingsService {
       .leftJoinAndSelect('partner_concept.concept', 'concept');
 
     // Role-based visibility
-    if (roles.includes('admin')) {
+    if (roleFilter === 'customer') {
+      query.andWhere('booking.user = :userId', { userId });
+    } else if (roleFilter === 'partner') {
+      query.andWhere('partner.user = :userId', { userId });
+    } else if (roles.includes('admin')) {
       // Admin sees everything
     } else if (roles.includes('partner')) {
       // Partner sees bookings made with them
@@ -197,6 +202,7 @@ export class BookingsService {
 
   async findOne(id: number, userId: number, roles: string[]): Promise<Booking> {
     const query = this.dataSource.getRepository(Booking).createQueryBuilder('booking')
+      .leftJoinAndSelect('booking.user', 'user')
       .leftJoinAndSelect('booking.partner', 'partner')
       .leftJoinAndSelect('booking.promotion', 'promotion')
       .leftJoinAndSelect('booking.payments', 'payments')
@@ -253,22 +259,34 @@ export class BookingsService {
 
       const booking = await bookingsRepo.findOne({
         where: { id },
-        relations: ['partner', 'partner.user', 'payments'],
+        relations: ['partner', 'partner.user', 'payments', 'user'],
       });
 
       if (!booking) {
         throw new NotFoundException(`Không tìm thấy đơn đặt lịch #${id}`);
       }
 
-      // Authorization: Admin or the specific partner
+      // Authorization: Admin, specific partner, or the customer who created it
       if (!roles.includes('admin')) {
-        if (
-          !roles.includes('partner') ||
-          !booking.partner ||
-          !booking.partner.user ||
-          booking.partner.user.id !== userId
-        ) {
+        const isPartnerOfBooking = roles.includes('partner') && 
+          booking.partner && 
+          booking.partner.user && 
+          booking.partner.user.id === userId;
+        
+        const isCustomerOfBooking = booking.user && booking.user.id === userId;
+
+        if (!isPartnerOfBooking && !isCustomerOfBooking) {
           throw new ForbiddenException('Bạn không có quyền cập nhật trạng thái đơn đặt lịch này');
+        }
+
+        // If customer is performing the update
+        if (!isPartnerOfBooking && isCustomerOfBooking) {
+          if (status !== BookingStatus.CANCELLED) {
+            throw new ForbiddenException('Khách hàng chỉ có quyền hủy đơn hàng');
+          }
+          if (booking.status !== BookingStatus.PENDING) {
+            throw new BadRequestException('Chỉ có thể hủy đơn hàng khi đơn đang ở trạng thái chờ xác nhận');
+          }
         }
       }
 
@@ -314,6 +332,96 @@ export class BookingsService {
       await bookingsRepo.save(booking);
 
       return this.findOne(id, userId, roles);
+    });
+  }
+
+  async applyPromotion(id: number, userId: number, code: string): Promise<Booking> {
+    return await this.dataSource.transaction(async (manager) => {
+      const bookingsRepo = manager.getRepository(Booking);
+      const promotionsRepo = manager.getRepository(Promotion);
+
+      const booking = await bookingsRepo.findOne({
+        where: { id },
+        relations: ['user', 'promotion', 'payments'],
+      });
+
+      if (!booking) {
+        throw new NotFoundException(`Không tìm thấy đơn đặt lịch #${id}`);
+      }
+
+      if (booking.user.id !== userId) {
+        throw new ForbiddenException('Bạn không có quyền sửa đổi đơn đặt lịch này');
+      }
+
+      if (booking.status !== BookingStatus.PENDING) {
+        throw new BadRequestException('Chỉ có thể áp dụng mã giảm giá cho đơn hàng chờ xác nhận');
+      }
+
+      const hasPaid = booking.payments?.some(p => p.status !== PaymentStatus.UNPAID);
+      if (hasPaid) {
+        throw new BadRequestException('Đơn hàng đã được thanh toán cọc hoặc toàn bộ, không thể áp dụng mã giảm giá');
+      }
+
+      if (booking.promotion) {
+        throw new BadRequestException('Đơn hàng này đã áp dụng mã giảm giá, không thể thay đổi hoặc áp dụng mã mới');
+      }
+
+      // If code is empty, remove the promotion
+      if (!code || code.trim() === '') {
+        booking.price_discount = 0;
+        booking.price_deposit = parseFloat((Number(booking.price) * 0.3).toFixed(2));
+        booking.remaining_amount = Number(booking.price);
+        booking.promotion = null as any;
+
+        await bookingsRepo.save(booking);
+        return this.findOne(id, userId, ['customer']);
+      }
+
+      const promotion = await promotionsRepo.findOne({
+        where: { code: code.toUpperCase() },
+      });
+
+      if (!promotion) {
+        throw new NotFoundException(`Mã giảm giá '${code}' không tồn tại`);
+      }
+
+      if (!promotion.is_active) {
+        throw new BadRequestException(`Khuyến mãi '${code}' hiện đang bị vô hiệu hoá`);
+      }
+
+      if (promotion.expired_at && new Date(promotion.expired_at) < new Date()) {
+        throw new BadRequestException(`Khuyến mãi '${code}' đã hết hạn sử dụng`);
+      }
+
+      // Calculate discount
+      const totalPrice = Number(booking.price);
+      let discountAmount = 0;
+
+      if (promotion.discount_percentage > 0) {
+        discountAmount = totalPrice * (promotion.discount_percentage / 100);
+      } else if (promotion.discount_amount > 0) {
+        discountAmount = Number(promotion.discount_amount);
+      }
+
+      if (promotion.max_discount && discountAmount > Number(promotion.max_discount)) {
+        discountAmount = Number(promotion.max_discount);
+      }
+
+      if (discountAmount > totalPrice) {
+        discountAmount = totalPrice;
+      }
+
+      const netPrice = totalPrice - discountAmount;
+      const depositAmount = parseFloat((netPrice * 0.3).toFixed(2));
+
+      booking.price_discount = discountAmount;
+      booking.price_deposit = depositAmount;
+      booking.remaining_amount = netPrice;
+      booking.promotion = promotion;
+
+      await bookingsRepo.save(booking);
+
+      return this.findOne(id, userId, ['customer']);
     });
   }
 }

@@ -37,7 +37,7 @@ export class WsJwtGuard implements CanActivate {
       // Gắn user vào socket để dùng trong handler
       (client as any).user = {
         userId: parseInt(payload.sub, 10),
-        roles: payload.roles ?? [],
+        roles: (payload.roles ?? []).map((r: string) => r.toLowerCase()),
       };
 
       return true;

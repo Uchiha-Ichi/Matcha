@@ -1,9 +1,13 @@
-import { IsNotEmpty, IsNumber, IsOptional } from 'class-validator';
+import { IsNumber, IsOptional } from 'class-validator';
 
 export class CreateConversationDto {
   @IsNumber()
-  @IsNotEmpty()
-  partner_id!: number;
+  @IsOptional()
+  partner_id?: number;
+
+  @IsNumber()
+  @IsOptional()
+  user_id?: number;
 
   @IsNumber()
   @IsOptional()
