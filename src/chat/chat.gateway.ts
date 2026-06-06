@@ -14,6 +14,11 @@ import { ChatService } from './chat.service';
 import { WsJwtGuard } from './ws-jwt.guard';
 import { SendMessageDto } from './dto/send-message.dto';
 import { CreateConversationDto } from './dto/create-conversation.dto';
+import { JoinRoomDto } from './dto/join-room.dto';
+import { LeaveRoomDto } from './dto/leave-room.dto';
+import { GetMessagesDto } from './dto/get-messages.dto';
+import { MarkReadDto } from './dto/mark-read.dto';
+import { TypingDto } from './dto/typing.dto';
 
 @WebSocketGateway({
   cors: {
@@ -57,10 +62,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('join_room')
   async handleJoinRoom(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { conversation_id: number },
+    @MessageBody() dto: JoinRoomDto,
   ) {
-    const room = `conversation_${data.conversation_id}`;
+    const room = `conversation_${dto.conversation_id}`;
     await client.join(room);
+    console.log(`[Chat] Client ${client.id} successfully joined room: ${room}`);
     return { event: 'joined', room };
   }
 
@@ -71,10 +77,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('leave_room')
   async handleLeaveRoom(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { conversation_id: number },
+    @MessageBody() dto: LeaveRoomDto,
   ) {
-    const room = `conversation_${data.conversation_id}`;
+    const room = `conversation_${dto.conversation_id}`;
     await client.leave(room);
+    console.log(`[Chat] Client ${client.id} left room: ${room}`);
     return { event: 'left', room };
   }
 
@@ -87,8 +94,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() dto: CreateConversationDto,
   ) {
-    const { userId } = this.getCurrentUser(client);
-    const conversation = await this.chatService.getOrCreateConversation(userId, dto);
+    const { userId, roles } = this.getCurrentUser(client);
+    const conversation = await this.chatService.getOrCreateConversation(userId, roles, dto);
     // Tự join room ngay
     await client.join(`conversation_${conversation.id}`);
     return { event: 'conversation_ready', data: { conversation } };
@@ -112,12 +119,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('get_messages')
   async handleGetMessages(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { conversation_id: number; page?: number },
+    @MessageBody() dto: GetMessagesDto,
   ) {
     this.getCurrentUser(client); // xác thực
     const messages = await this.chatService.getMessages(
-      data.conversation_id,
-      data.page ?? 1,
+      dto.conversation_id,
+      dto.page ?? 1,
     );
     return { event: 'messages_history', data: { messages } };
   }
@@ -132,9 +139,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() dto: SendMessageDto,
   ) {
     const { userId } = this.getCurrentUser(client);
+    console.log(`[Chat] Client ${client.id} (user ${userId}) is sending message to conversation ${dto.conversation_id}`);
     const message = await this.chatService.saveMessage(userId, dto);
     const room = `conversation_${dto.conversation_id}`;
 
+    console.log(`[Chat] Broadcasting new_message to room ${room}:`, message);
     // Phát tới tất cả client trong phòng (kể cả người gửi)
     this.server.to(room).emit('new_message', message);
 
@@ -148,13 +157,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('mark_read')
   async handleMarkRead(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { conversation_id: number },
+    @MessageBody() dto: MarkReadDto,
   ) {
     const { userId } = this.getCurrentUser(client);
-    await this.chatService.markAsRead(data.conversation_id, userId);
-    const room = `conversation_${data.conversation_id}`;
+    await this.chatService.markAsRead(dto.conversation_id, userId);
+    const room = `conversation_${dto.conversation_id}`;
     // Thông báo cho phòng biết user này đã đọc
-    this.server.to(room).emit('messages_read', { conversation_id: data.conversation_id, user_id: userId });
+    this.server.to(room).emit('messages_read', { conversation_id: dto.conversation_id, user_id: userId });
     return { event: 'marked_read', data: null };
   }
 
@@ -165,11 +174,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('typing')
   handleTyping(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { conversation_id: number; is_typing: boolean },
+    @MessageBody() dto: TypingDto,
   ) {
     const { userId } = this.getCurrentUser(client);
-    const room = `conversation_${data.conversation_id}`;
+    const room = `conversation_${dto.conversation_id}`;
     // Broadcast cho người khác trong phòng (trừ người gửi)
-    client.to(room).emit('user_typing', { user_id: userId, is_typing: data.is_typing });
+    client.to(room).emit('user_typing', { user_id: userId, is_typing: dto.is_typing });
   }
 }

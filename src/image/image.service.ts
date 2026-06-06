@@ -110,4 +110,12 @@ export class ImageService {
   async deleteImage(id: number): Promise<void> {
     await this.imagesRepository.delete(id);
   }
+
+  async setPrimary(targetType: ImageTargetType, targetId: number, imageId: number): Promise<void> {
+    await this.imagesRepository.update(
+      { target_type: targetType, target_id: targetId },
+      { is_primary: 0 }
+    );
+    await this.imagesRepository.update(imageId, { is_primary: 1 });
+  }
 }
