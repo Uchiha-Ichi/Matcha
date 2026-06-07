@@ -64,7 +64,7 @@ export class AuthService {
         // Nhúng roles vào access token để RolesGuard đọc được
         const accessToken = this.jwtService.sign(
             { sub: userId, roles },
-            { secret: accessSecret, expiresIn: "15m" }
+            { secret: accessSecret, expiresIn: "1d" }
         );
         const refreshToken = this.jwtService.sign(
             { sub: userId },
