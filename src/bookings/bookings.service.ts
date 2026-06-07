@@ -8,12 +8,12 @@ import { User } from '../users/entities/user.entity';
 import { Partner } from '../partners/entities/partner.entity';
 import { Promotion } from '../promotions/entities/promotion.entity';
 import { PartnerConcept } from '../partner-concepts/entities/partner-concept.entity';
-import { Payment, PaymentProvider, PaymentStatus, PaymentType } from '../payments/entities/payment.entity';
+import { Payment, PaymentStatus } from '../payments/entities/payment.entity';
 import { DateBlock } from '../date-blocks/entities/date-block.entity';
 
 @Injectable()
 export class BookingsService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(private readonly dataSource: DataSource) { }
 
   async create(userId: number, createBookingDto: CreateBookingDto): Promise<Booking> {
     const { partner_id, booking_time, promotion_id, partner_concept_ids } = createBookingDto;
@@ -57,7 +57,7 @@ export class BookingsService {
         if (!block.start_time || !block.end_time) {
           throw new BadRequestException(`Đối tác đã chặn lịch vào ngày ${dateString}`);
         }
-        
+
         // If time-range block matches the requested time
         if (timeString >= block.start_time && timeString <= block.end_time) {
           throw new BadRequestException(
@@ -140,7 +140,6 @@ export class BookingsService {
         price_deposit: depositAmount,
         remaining_amount: netPrice,
         booking_time: new Date(booking_time),
-        status: BookingStatus.PENDING,
       });
 
       const savedBooking = await bookingsRepository.save(booking);
@@ -161,8 +160,6 @@ export class BookingsService {
       const paymentRepository = manager.getRepository(Payment);
       const payment = paymentRepository.create({
         booking: savedBooking,
-        provider: PaymentProvider.PAYOS,
-        payment_type: PaymentType.DEPOSIT,
         status: PaymentStatus.UNPAID,
       });
       await paymentRepository.save(payment);
@@ -268,11 +265,11 @@ export class BookingsService {
 
       // Authorization: Admin, specific partner, or the customer who created it
       if (!roles.includes('admin')) {
-        const isPartnerOfBooking = roles.includes('partner') && 
-          booking.partner && 
-          booking.partner.user && 
+        const isPartnerOfBooking = roles.includes('partner') &&
+          booking.partner &&
+          booking.partner.user &&
           booking.partner.user.id === userId;
-        
+
         const isCustomerOfBooking = booking.user && booking.user.id === userId;
 
         if (!isPartnerOfBooking && !isCustomerOfBooking) {
@@ -310,7 +307,7 @@ export class BookingsService {
           unpaidPayment.status = PaymentStatus.PARTIALLY_PAID;
           unpaidPayment.amount_paid = Number(booking.price_deposit);
           await paymentsRepo.save(unpaidPayment);
-          
+
           booking.remaining_amount = Number(booking.price) - Number(booking.price_discount) - Number(unpaidPayment.amount_paid);
         }
       } else if (status === BookingStatus.COMPLETED) {
@@ -323,7 +320,7 @@ export class BookingsService {
           const netPrice = Number(booking.price) - Number(booking.price_discount);
           activePayment.amount_paid = netPrice;
           await paymentsRepo.save(activePayment);
-          
+
           booking.remaining_amount = 0;
         }
       }
@@ -360,10 +357,6 @@ export class BookingsService {
       const hasPaid = booking.payments?.some(p => p.status !== PaymentStatus.UNPAID);
       if (hasPaid) {
         throw new BadRequestException('Đơn hàng đã được thanh toán cọc hoặc toàn bộ, không thể áp dụng mã giảm giá');
-      }
-
-      if (booking.promotion) {
-        throw new BadRequestException('Đơn hàng này đã áp dụng mã giảm giá, không thể thay đổi hoặc áp dụng mã mới');
       }
 
       // If code is empty, remove the promotion
