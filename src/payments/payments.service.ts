@@ -225,7 +225,9 @@ export class PaymentsService {
     const paymentLinkId = webhookData.paymentLinkId ? String(webhookData.paymentLinkId) : undefined;
     const payment = await this.findPayosPayment(orderCode, paymentLinkId);
     if (!payment) {
-      throw new NotFoundException('Không tìm thấy giao dịch payOS');
+      return {
+        message: 'Không tìm thấy giao dịch tạm hoặc giao dịch đã được xử lý',
+      };
     }
 
     if (await this.deletePaymentIfExpired(payment)) {
@@ -372,7 +374,7 @@ export class PaymentsService {
     }
 
     if (!payment) {
-      throw new NotFoundException('Không tìm thấy giao dịch thanh toán tạm');
+      return { message: 'Khong tim thay giao dich tam hoac giao dich da duoc xu ly' };
     }
 
     if (![PaymentStatus.PENDING, PaymentStatus.PROCESSING].includes(payment.status)) {
@@ -565,15 +567,19 @@ export class PaymentsService {
   }
 
   private verifyPayosSignature(data: Record<string, any>, signature: string): boolean {
-    const expectedSignature = this.createPayosWebhookSignature(data);
-    return expectedSignature === signature;
+    const rawSignature = this.createPayosWebhookSignature(data);
+    const encodedSignature = this.createPayosWebhookSignature(data, true);
+    return rawSignature === signature || encodedSignature === signature;
   }
 
-  private createPayosWebhookSignature(data: Record<string, any>): string {
+  private createPayosWebhookSignature(data: Record<string, any>, encodeValue = false): string {
     const sortedData = Object.keys(data)
       .filter((key) => key !== 'signature' && data[key] !== undefined && data[key] !== null)
       .sort()
-      .map((key) => `${key}=${encodeURI(String(data[key]))}`)
+      .map((key) => {
+        const value = String(data[key]);
+        return `${key}=${encodeValue ? encodeURI(value) : value}`;
+      })
       .join('&');
 
     return crypto.createHmac('sha256', this.requireEnv('PAYOS_CHECKSUM_KEY')).update(sortedData).digest('hex');
