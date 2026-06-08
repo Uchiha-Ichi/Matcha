@@ -36,15 +36,19 @@ export class AuthService {
     }
 
     async signUpEmail(createUserDto: CreateUserDto) {
-        const existingUser = await this.usersService.findByEmail(createUserDto.email);
+        const normalizedEmail = createUserDto.email.trim().toLowerCase();
+        const existingUser = await this.usersService.findByEmail(normalizedEmail);
         if (existingUser) {
-            throw new BadRequestException("Email already in use");
+            throw new BadRequestException("Email đã được đăng ký");
         }
+        createUserDto.email = normalizedEmail;
+        createUserDto.full_name = createUserDto.full_name?.trim();
+        createUserDto.phone = createUserDto.phone?.trim();
         return this.usersService.create(createUserDto)
     }
 
     async signInEmail(email: string, password: string) {
-        const user = await this.usersService.findByEmail(email);
+        const user = await this.usersService.findByEmail(email.trim().toLowerCase());
         // Password undefined = Google user, không cho đăng nhập bằng email
         if (!user || !user.password) {
             throw new UnauthorizedException("Invalid credentials");
