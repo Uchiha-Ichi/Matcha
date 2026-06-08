@@ -100,7 +100,8 @@ export class ChatService {
       qb.where('user.id = :userId', { userId });
     }
 
-    return qb.getMany();
+    const conversations = await qb.getMany();
+    return this.attachUnreadCounts(conversations, userId);
   }
 
   /**
@@ -175,5 +176,50 @@ export class ChatService {
       .andWhere('user_id != :userId', { userId }) // Không đánh dấu tin nhắn của chính mình
       .andWhere('is_read = false')
       .execute();
+  }
+
+  async getUnreadCount(userId: number, roles: string[]): Promise<{ count: number }> {
+    const qb = this.messageRepo
+      .createQueryBuilder('message')
+      .innerJoin('message.conversation', 'conversation')
+      .innerJoin('conversation.partner', 'partner')
+      .where('message.is_read = false')
+      .andWhere('message.user_id != :userId', { userId });
+
+    if (roles.includes('admin')) {
+      // Admin sees all unread messages from other users.
+    } else if (roles.includes('partner')) {
+      qb.andWhere('partner.user_id = :userId', { userId });
+    } else {
+      qb.andWhere('conversation.user_id = :userId', { userId });
+    }
+
+    return { count: await qb.getCount() };
+  }
+
+  private async attachUnreadCounts(conversations: Conversation[], userId: number): Promise<Conversation[]> {
+    if (conversations.length === 0) return conversations;
+
+    const rows = await this.messageRepo
+      .createQueryBuilder('message')
+      .select('conversation.id', 'conversationId')
+      .addSelect('COUNT(message.id)', 'unreadCount')
+      .innerJoin('message.conversation', 'conversation')
+      .where('conversation.id IN (:...conversationIds)', {
+        conversationIds: conversations.map((conversation) => conversation.id),
+      })
+      .andWhere('message.is_read = false')
+      .andWhere('message.user_id != :userId', { userId })
+      .groupBy('conversation.id')
+      .getRawMany<{ conversationId: number | string; unreadCount: number | string }>();
+
+    const unreadByConversation = new Map(
+      rows.map((row) => [Number(row.conversationId), Number(row.unreadCount)]),
+    );
+
+    return conversations.map((conversation) => ({
+      ...conversation,
+      unread_count: unreadByConversation.get(conversation.id) ?? 0,
+    } as Conversation & { unread_count: number }));
   }
 }
