@@ -341,13 +341,14 @@ export class PaymentsService {
   }
 
   async findOne(id: number): Promise<Payment> {
-    const payment = await this.paymentsRepository.findOne({
+    let payment = await this.paymentsRepository.findOne({
       where: { id },
       relations: ['booking'],
     });
     if (!payment) {
       throw new NotFoundException(`Không tìm thấy giao dịch thanh toán #${id}`);
     }
+    payment = await this.syncPayosPaymentStatus(payment);
     if (await this.deletePaymentIfExpired(payment)) {
       throw new NotFoundException(`Giao dịch thanh toán #${id} đã hết hạn và được xóa`);
     }
@@ -425,6 +426,72 @@ export class PaymentsService {
       const message = error.response?.data?.desc || error.response?.data?.message || error.message;
       throw new InternalServerErrorException(`Không thể tạo link thanh toán payOS: ${message}`);
     }
+  }
+
+  private async getPayosPaymentRequest(id: string) {
+    const clientId = this.requireEnv('PAYOS_CLIENT_ID');
+    const apiKey = this.requireEnv('PAYOS_API_KEY');
+    const baseUrl = this.configService.get<string>('PAYOS_API_BASE_URL') || 'https://api-merchant.payos.vn';
+
+    try {
+      const response = await axios.get(`${baseUrl}/v2/payment-requests/${id}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-client-id': clientId,
+          'x-api-key': apiKey,
+        },
+      });
+
+      if (response.data?.code !== '00') {
+        throw new BadRequestException(response.data?.desc || 'payOS lay thong tin thanh toan that bai');
+      }
+
+      return response.data;
+    } catch (error: any) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      const message = error.response?.data?.desc || error.response?.data?.message || error.message;
+      throw new InternalServerErrorException(`Khong the dong bo trang thai thanh toan payOS: ${message}`);
+    }
+  }
+
+  private async syncPayosPaymentStatus(payment: Payment): Promise<Payment> {
+    if (
+      payment.provider !== PaymentProvider.PAYOS ||
+      ![PaymentStatus.PENDING, PaymentStatus.PROCESSING].includes(payment.status)
+    ) {
+      return payment;
+    }
+
+    const payosId = payment.order_code || payment.payment_link_id;
+    if (!payosId) {
+      return payment;
+    }
+
+    const response = await this.getPayosPaymentRequest(payosId);
+    const data = response?.data;
+    const status = String(data?.status || '').toUpperCase();
+
+    payment.raw_response = response;
+
+    if (status === 'PAID') {
+      const paidAmount = Number(data?.amountPaid || data?.amount || payment.amount);
+      const result = await this.markPaymentPaid(payment, paidAmount, response);
+      return result.payment;
+    }
+
+    if (status === 'CANCELLED') {
+      await this.paymentsRepository.remove(payment);
+      throw new NotFoundException('Giao dich thanh toan da bi huy');
+    }
+
+    if (status === 'EXPIRED') {
+      await this.paymentsRepository.remove(payment);
+      throw new NotFoundException('Giao dich thanh toan da het han');
+    }
+
+    return this.paymentsRepository.save(payment);
   }
 
   private async findPayosPayment(orderCode?: string, paymentLinkId?: string): Promise<Payment | null> {
@@ -531,10 +598,23 @@ export class PaymentsService {
 
       const paidAmount = Number(amountPaid || paymentInTx.amount);
       const netPrice = Number(booking.price) - Number(booking.price_discount);
-      const totalPaid = Math.min(netPrice, Number(paymentInTx.amount_paid || 0) + paidAmount);
+      const previousPaid = await paymentsRepository
+        .createQueryBuilder('payment')
+        .where('payment.booking_id = :bookingId', { bookingId: booking.id })
+        .andWhere('payment.id != :paymentId', { paymentId: paymentInTx.id })
+        .andWhere('payment.status IN (:...statuses)', {
+          statuses: [PaymentStatus.PAID, PaymentStatus.PARTIALLY_PAID],
+        })
+        .select('COALESCE(SUM(payment.amount_paid), 0)', 'total')
+        .getRawOne<{ total: string }>();
+      const previousPaidAmount = Number(previousPaid?.total || 0);
+      const currentPaidAmount = Math.max(Number(paymentInTx.amount_paid || 0), paidAmount);
+      const totalPaid = Math.min(netPrice, previousPaidAmount + currentPaidAmount);
 
-      paymentInTx.amount_paid = totalPaid;
-      paymentInTx.status = totalPaid >= netPrice ? PaymentStatus.PAID : PaymentStatus.PARTIALLY_PAID;
+      paymentInTx.amount_paid = Math.min(Number(paymentInTx.amount || currentPaidAmount), currentPaidAmount);
+      paymentInTx.status = totalPaid >= netPrice || paymentInTx.amount_paid >= Number(paymentInTx.amount)
+        ? PaymentStatus.PAID
+        : PaymentStatus.PARTIALLY_PAID;
       paymentInTx.paid_at = paymentInTx.paid_at ?? new Date();
       paymentInTx.raw_webhook = rawData ?? paymentInTx.raw_webhook;
 

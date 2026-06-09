@@ -15,6 +15,30 @@ import { DateBlock } from '../date-blocks/entities/date-block.entity';
 export class BookingsService {
   constructor(private readonly dataSource: DataSource) { }
 
+  private parseDurationMinutes(value?: string): number {
+    if (!value) return 0;
+    const text = String(value).toLowerCase().replace(',', '.');
+    const hourMatch = text.match(/(\d+(?:\.\d+)?)\s*(h|giờ|gio|hour)/);
+    const minuteMatch = text.match(/(\d+(?:\.\d+)?)\s*(m|phút|phut|min)/);
+
+    if (hourMatch) return Math.round(Number(hourMatch[1]) * 60);
+    if (minuteMatch) return Math.round(Number(minuteMatch[1]));
+
+    const numberOnly = Number(text.match(/\d+(?:\.\d+)?/)?.[0] ?? 0);
+    return numberOnly > 0 ? Math.round(numberOnly * 60) : 0;
+  }
+
+  private timeToMinutes(value?: string): number | null {
+    if (!value) return null;
+    const [hours, minutes] = String(value).split(':').map(Number);
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+    return hours * 60 + minutes;
+  }
+
+  private rangesOverlap(startA: number, endA: number, startB: number, endB: number): boolean {
+    return startA < endB && endA > startB;
+  }
+
   async create(userId: number, createBookingDto: CreateBookingDto): Promise<Booking> {
     const { partner_id, booking_time, promotion_id, partner_concept_ids } = createBookingDto;
 
@@ -81,6 +105,43 @@ export class BookingsService {
         if (concept.partner.id !== partner_id) {
           throw new BadRequestException(
             `Concept #${concept.id} không thuộc về đối tác #${partner_id}`
+          );
+        }
+      }
+
+      const requestedStartMinutes = this.timeToMinutes(timeString);
+      const totalDurationMinutes = partnerConcepts.reduce(
+        (sum, concept) => sum + this.parseDurationMinutes(concept.time),
+        0
+      );
+      const requestedEndMinutes = requestedStartMinutes !== null && totalDurationMinutes > 0
+        ? requestedStartMinutes + totalDurationMinutes
+        : requestedStartMinutes;
+
+      for (const block of blocksOnDate) {
+        if (!block.start_time || !block.end_time) {
+          continue;
+        }
+
+        const blockStartMinutes = this.timeToMinutes(block.start_time);
+        const blockEndMinutes = this.timeToMinutes(block.end_time);
+        if (
+          requestedStartMinutes === null ||
+          requestedEndMinutes === null ||
+          blockStartMinutes === null ||
+          blockEndMinutes === null
+        ) {
+          continue;
+        }
+
+        const hasConflict = totalDurationMinutes > 0
+          ? this.rangesOverlap(requestedStartMinutes, requestedEndMinutes, blockStartMinutes, blockEndMinutes)
+          : requestedStartMinutes >= blockStartMinutes && requestedStartMinutes <= blockEndMinutes;
+
+        if (hasConflict) {
+          const requestedEndTime = `${String(Math.floor((requestedEndMinutes / 60) % 24)).padStart(2, '0')}:${String(requestedEndMinutes % 60).padStart(2, '0')}`;
+          throw new BadRequestException(
+            `Thá»i gian Ä‘áº·t lá»‹ch (${timeString.slice(0, 5)}${totalDurationMinutes > 0 ? ` - ${requestedEndTime}` : ''}) ngÃ y ${dateString} trÃ¹ng khung giá» Ä‘Ã£ bá»‹ cháº·n cá»§a Ä‘á»‘i tÃ¡c (${block.start_time.slice(0, 5)} - ${block.end_time.slice(0, 5)})`
           );
         }
       }
