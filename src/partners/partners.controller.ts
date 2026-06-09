@@ -59,7 +59,7 @@ export class PartnersController {
   }
 
   @Patch(':id')
-  @Roles('admin', 'partner')
+  @Roles('admin', 'partner', 'customer')
   async update(@Param('id') id: string, @Body() updatePartnerDto: UpdatePartnerDto) {
     const partner = await this.partnersService.update(+id, updatePartnerDto);
     return partner;
