@@ -13,7 +13,7 @@ import type { Response, Request } from 'express';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { IsEmail, IsNotEmpty, IsString, MinLength, IsInt, IsIn } from 'class-validator';
+import { IsEmail, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, MinLength } from 'class-validator';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { UsersService } from '../users/users.service';
 class SignUpDto implements CreateUserDto {
@@ -23,6 +23,8 @@ class SignUpDto implements CreateUserDto {
   full_name!: string;
 
   @IsString()
+  @IsOptional()
+  @Matches(/^(0|\+84)(\d{9})$/, { message: 'Số điện thoại không đúng định dạng' })
   phone?: string;
 
   @IsEmail({}, { message: 'Email không đúng định dạng' })
@@ -33,9 +35,9 @@ class SignUpDto implements CreateUserDto {
   @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
   @MinLength(6, { message: 'Mật khẩu phải ít nhất 6 ký tự' })
   password!: string;
-
-  @IsInt({ message: 'Vai trò phải là một số nguyên' })
-  // @IsIn([1, 2], { message: 'Vai trò không hợp lệ. Chỉ chấp nhận 1 (Khách hàng) hoặc 2 (Đối tác)' })
+  @IsOptional()
+  @IsInt({ message: 'Vai tro phai la mot so nguyen' })
+  @IsIn([1, 2, 3], { message: 'Vai tro khong hop le' })
   role_id?: number;
 }
 
