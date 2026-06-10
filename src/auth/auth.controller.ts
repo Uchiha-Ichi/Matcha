@@ -80,7 +80,7 @@ export class AuthController {
     );
 
     this.setAuthCookies(res, accessToken, refreshToken);
-    return { message: 'Đăng ký thành công', userId: user.id };
+    return { message: 'Đăng ký thành công', userId: user.id, accessToken, refreshToken };
   }
 
   // ────────────────────────────────────────────────────────────────
@@ -101,6 +101,8 @@ export class AuthController {
       userId: user.id,
       user: user,
       roles,
+      accessToken,
+      refreshToken,
     };
   }
 
@@ -110,12 +112,22 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const refreshToken = req.cookies?.['refresh_token'];
+    let refreshToken = req.cookies?.['refresh_token'];
+    if (!refreshToken) {
+      const authHeader = req.headers['authorization'];
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        refreshToken = authHeader.substring(7);
+      }
+    }
+    if (!refreshToken && req.body && req.body.refreshToken) {
+      refreshToken = req.body.refreshToken;
+    }
+
     const { accessToken, refreshToken: newRefreshToken } =
       await this.authService.refreshToken(refreshToken);
 
     this.setAuthCookies(res, accessToken, newRefreshToken);
-    return { message: 'Token đã được làm mới' };
+    return { message: 'Token đã được làm mới', accessToken, refreshToken: newRefreshToken };
   }
 
   // ────────────────────────────────────────────────────────────────
