@@ -34,6 +34,7 @@ async function bootstrap() {
     origin: [
       process.env.FRONTEND_URL,
       'https://matcha.net.vn',
+      'https://www.matcha.net.vn',
       'https://matcha-fe-2uwg.vercel.app',
       'http://localhost:5173',
       'http://localhost:5174',
