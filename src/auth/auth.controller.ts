@@ -144,23 +144,34 @@ export class AuthController {
 
   // ── Helper: gắn token vào httpOnly cookie ──────────────────────
   private setAuthCookies(res: Response, accessToken: string, refreshToken: string): void {
+    const isProd = process.env.NODE_ENV === 'production';
     res.cookie('access_token', accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
       maxAge: COOKIE_ACCESS_TTL,
     });
     res.cookie('refresh_token', refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
       maxAge: COOKIE_REFRESH_TTL,
       path: '/api/v1/auth/refresh', // Chỉ gửi cookie này khi gọi /refresh
     });
   }
 
   private clearAuthCookies(res: Response): void {
-    res.clearCookie('access_token');
-    res.clearCookie('refresh_token', { path: '/api/v1/auth/refresh' });
+    const isProd = process.env.NODE_ENV === 'production';
+    res.clearCookie('access_token', {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+    });
+    res.clearCookie('refresh_token', {
+      path: '/api/v1/auth/refresh',
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+    });
   }
 }
