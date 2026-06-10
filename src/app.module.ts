@@ -73,6 +73,7 @@ import { LoggerMiddleware } from './common/middleware/logger.middleware';
 
         // entities: [User, Booking, Message...], // Bạn sẽ nạp các bảng (table) vào đây sau
         autoLoadEntities: true,
+        legacySpatialSupport: false, // Bắt buộc false cho MySQL 8.0+ để dùng ST_AsText thay vì AsText
 
         // CẢNH BÁO: synchronize=true sẽ tự động tạo/sửa bảng trong DB theo code của bạn.
         // Rất tiện khi code môi trường Dev, nhưng TUYỆT ĐỐI tắt (false) khi đưa lên Production (thực tế).
