@@ -22,7 +22,14 @@ import { TypingDto } from './dto/typing.dto';
 
 @WebSocketGateway({
   cors: {
-    origin: ['http://localhost:5173', 'http://localhost:5174'],
+    origin: [
+      process.env.FRONTEND_URL,
+      'https://matcha.net.vn',
+      'https://www.matcha.net.vn',
+      'https://matcha-fe-2uwg.vercel.app',
+      'http://localhost:5173',
+      'http://localhost:5174',
+    ].filter(Boolean),
     credentials: true,
   },
   namespace: '/chat',      // FE kết nối: io('http://localhost:8000/chat')
