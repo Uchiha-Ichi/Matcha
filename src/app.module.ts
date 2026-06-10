@@ -76,7 +76,7 @@ import { LoggerMiddleware } from './common/middleware/logger.middleware';
 
         // CẢNH BÁO: synchronize=true sẽ tự động tạo/sửa bảng trong DB theo code của bạn.
         // Rất tiện khi code môi trường Dev, nhưng TUYỆT ĐỐI tắt (false) khi đưa lên Production (thực tế).
-        synchronize: true,
+        synchronize: false,
       }),
     }),
 
