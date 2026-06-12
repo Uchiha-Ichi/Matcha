@@ -35,10 +35,22 @@ class SignUpDto implements CreateUserDto {
   @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
   @MinLength(6, { message: 'Mật khẩu phải ít nhất 6 ký tự' })
   password!: string;
+
   @IsOptional()
   @IsInt({ message: 'Vai tro phai la mot so nguyen' })
   @IsIn([1, 2, 3], { message: 'Vai tro khong hop le' })
   role_id?: number;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Mã xác thực không được để trống' })
+  @MinLength(6, { message: 'Mã xác thực phải gồm 6 ký tự' })
+  otp!: string;
+}
+
+class SendSignUpOtpDto {
+  @IsEmail({}, { message: 'Email không đúng định dạng' })
+  @IsNotEmpty({ message: 'Email không được để trống' })
+  email!: string;
 }
 
 
@@ -53,6 +65,39 @@ class SignInDto {
   password!: string;
 }
 
+class ForgotPasswordDto {
+  @IsEmail({}, { message: 'Email không đúng định dạng' })
+  @IsNotEmpty({ message: 'Email không được để trống' })
+  email!: string;
+}
+
+class VerifyOtpDto {
+  @IsEmail({}, { message: 'Email không đúng định dạng' })
+  @IsNotEmpty({ message: 'Email không được để trống' })
+  email!: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Mã xác thực không được để trống' })
+  @MinLength(6, { message: 'Mã xác thực phải gồm 6 ký tự' })
+  otp!: string;
+}
+
+class ResetPasswordDto {
+  @IsEmail({}, { message: 'Email không đúng định dạng' })
+  @IsNotEmpty({ message: 'Email không được để trống' })
+  email!: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Mã xác thực không được để trống' })
+  @MinLength(6, { message: 'Mã xác thực phải gồm 6 ký tự' })
+  otp!: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Mật khẩu mới không được để trống' })
+  @MinLength(6, { message: 'Mật khẩu mới phải ít nhất 6 ký tự' })
+  password!: string;
+}
+
 // Thời gian sống cookie (ms)
 const COOKIE_ACCESS_TTL = 15 * 60 * 1000;        // 15 phút
 const COOKIE_REFRESH_TTL = 7 * 24 * 60 * 60 * 1000; // 7 ngày
@@ -63,6 +108,15 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly usersService: UsersService,
   ) { }
+
+  // ────────────────────────────────────────────────────────────────
+  // POST /api/v1/auth/signup/send-otp — Gửi mã xác thực đăng ký
+  // ────────────────────────────────────────────────────────────────
+  @Post('signup/send-otp')
+  @HttpCode(HttpStatus.OK)
+  async sendSignUpOtp(@Body() dto: SendSignUpOtpDto) {
+    return this.authService.sendSignUpOtp(dto.email);
+  }
 
   // ────────────────────────────────────────────────────────────────
   // POST /api/v1/auth/signup — Đăng ký bằng email
@@ -152,6 +206,33 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   getMe(@CurrentUser() currentUser: { userId: number; roles: string[] }) {
     return { userId: currentUser.userId, roles: currentUser.roles };
+  }
+
+  // ────────────────────────────────────────────────────────────────
+  // POST /api/v1/auth/forgot-password — Gửi OTP đặt lại mật khẩu
+  // ────────────────────────────────────────────────────────────────
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.sendForgotPasswordOtp(dto.email);
+  }
+
+  // ────────────────────────────────────────────────────────────────
+  // POST /api/v1/auth/verify-otp — Xác thực mã OTP
+  // ────────────────────────────────────────────────────────────────
+  @Post('verify-otp')
+  @HttpCode(HttpStatus.OK)
+  async verifyOtp(@Body() dto: VerifyOtpDto) {
+    return this.authService.verifyForgotPasswordOtp(dto.email, dto.otp);
+  }
+
+  // ────────────────────────────────────────────────────────────────
+  // POST /api/v1/auth/reset-password — Đặt lại mật khẩu mới
+  // ────────────────────────────────────────────────────────────────
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto.email, dto.otp, dto.password);
   }
 
   // ── Helper: gắn token vào httpOnly cookie ──────────────────────

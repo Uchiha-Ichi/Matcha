@@ -24,6 +24,7 @@ import { ImageModule } from './image/image.module';
 import { StatisticsModule } from './statistics/statistics.module';
 import { ChatModule } from './chat/chat.module';
 import { AiModule } from './ai/ai.module';
+import { MailModule } from './mail/mail.module';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 
 
@@ -132,6 +133,8 @@ import { LoggerMiddleware } from './common/middleware/logger.middleware';
     ChatModule,
 
     AiModule,
+
+    MailModule,
   ],
   controllers: [],
   providers: [],

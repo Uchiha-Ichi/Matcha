@@ -12,13 +12,15 @@ import { Redis } from "ioredis";
 import { UsersService } from "../users/users.service";
 import * as crypto from "crypto";
 import { CreateUserDto } from "../users/dto/create-user.dto";
+import { MailService } from "../mail/mail.service";
 @Injectable()
 export class AuthService {
     constructor(
         private jwtService: JwtService,
         private usersService: UsersService,
         private configService: ConfigService,
-        @InjectRedis() private readonly redis: Redis
+        @InjectRedis() private readonly redis: Redis,
+        private mailService: MailService
     ) { }
 
     async validateGoogleUser(profile: {
@@ -35,8 +37,37 @@ export class AuthService {
         return { user, roles };
     }
 
-    async signUpEmail(createUserDto: CreateUserDto) {
+    async sendSignUpOtp(email: string) {
+        const normalizedEmail = email.trim().toLowerCase();
+        const user = await this.usersService.findByEmail(normalizedEmail);
+        if (user) {
+            throw new BadRequestException("Email đã được đăng ký trong hệ thống");
+        }
+
+        // Tạo OTP gồm 6 chữ số ngẫu nhiên
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+        // Lưu OTP vào Redis với TTL là 10 phút (600 giây)
+        await this.redis.set(`otp:signup:${normalizedEmail}`, otp, "EX", 600);
+
+        // Gửi email chứa mã OTP
+        const sent = await this.mailService.sendSignUpOtpEmail(normalizedEmail, otp);
+        if (!sent) {
+            throw new BadRequestException("Không thể gửi email xác thực. Vui lòng thử lại sau.");
+        }
+
+        return { message: "Mã xác thực đã được gửi đến email của bạn" };
+    }
+
+    async signUpEmail(createUserDto: CreateUserDto & { otp?: string }) {
         const normalizedEmail = createUserDto.email.trim().toLowerCase();
+
+        // 1. Kiểm tra OTP đăng ký trước
+        const storedOtp = await this.redis.get(`otp:signup:${normalizedEmail}`);
+        if (!storedOtp || storedOtp !== createUserDto.otp?.trim()) {
+            throw new BadRequestException("Mã xác thực không hợp lệ hoặc đã hết hạn");
+        }
+
         const existingUser = await this.usersService.findByEmail(normalizedEmail);
         if (existingUser) {
             throw new BadRequestException("Email đã được đăng ký");
@@ -44,7 +75,72 @@ export class AuthService {
         createUserDto.email = normalizedEmail;
         createUserDto.full_name = createUserDto.full_name?.trim();
         createUserDto.phone = createUserDto.phone?.trim();
-        return this.usersService.create(createUserDto)
+
+        // Loại bỏ trường otp trước khi lưu DB
+        const { otp, ...userFields } = createUserDto;
+        const user = await this.usersService.create(userFields);
+
+        // Xóa OTP khỏi Redis sau khi đăng ký thành công
+        await this.redis.del(`otp:signup:${normalizedEmail}`);
+        
+        // Gửi email chào mừng không chặn luồng đăng ký chính
+        this.mailService.sendSignUpEmail(user.email, user.full_name).catch(err => {
+            console.error('Lỗi gửi mail chào mừng:', err);
+        });
+
+        return user;
+    }
+
+    async sendForgotPasswordOtp(email: string) {
+        const normalizedEmail = email.trim().toLowerCase();
+        const user = await this.usersService.findByEmail(normalizedEmail);
+        if (!user) {
+            throw new BadRequestException("Email không tồn tại trong hệ thống");
+        }
+
+        // Tạo OTP gồm 6 chữ số ngẫu nhiên
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+        // Lưu OTP vào Redis với TTL là 10 phút (600 giây)
+        await this.redis.set(`otp:password-reset:${normalizedEmail}`, otp, "EX", 600);
+
+        // Gửi email chứa mã OTP
+        const sent = await this.mailService.sendForgotPasswordOtpEmail(normalizedEmail, otp);
+        if (!sent) {
+            throw new BadRequestException("Không thể gửi email khôi phục mật khẩu. Vui lòng thử lại sau.");
+        }
+
+        return { message: "Mã xác thực đã được gửi đến email của bạn" };
+    }
+
+    async verifyForgotPasswordOtp(email: string, otp: string) {
+        const normalizedEmail = email.trim().toLowerCase();
+        const storedOtp = await this.redis.get(`otp:password-reset:${normalizedEmail}`);
+        if (!storedOtp || storedOtp !== otp.trim()) {
+            throw new BadRequestException("Mã xác thực không hợp lệ hoặc đã hết hạn");
+        }
+        return { message: "Mã xác thực hợp lệ" };
+    }
+
+    async resetPassword(email: string, otp: string, passwordReset: string) {
+        const normalizedEmail = email.trim().toLowerCase();
+        const storedOtp = await this.redis.get(`otp:password-reset:${normalizedEmail}`);
+        if (!storedOtp || storedOtp !== otp.trim()) {
+            throw new BadRequestException("Mã xác thực không hợp lệ hoặc đã hết hạn");
+        }
+
+        const user = await this.usersService.findByEmail(normalizedEmail);
+        if (!user) {
+            throw new BadRequestException("Người dùng không tồn tại");
+        }
+
+        // Cập nhật mật khẩu mới (usersService.update tự động hash mật khẩu)
+        await this.usersService.update(user.id, { password: passwordReset });
+
+        // Xóa OTP khỏi Redis
+        await this.redis.del(`otp:password-reset:${normalizedEmail}`);
+
+        return { message: "Đặt lại mật khẩu thành công" };
     }
 
     async signInEmail(email: string, password: string) {
