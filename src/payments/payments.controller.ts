@@ -72,7 +72,11 @@ export class PaymentsController {
   @HttpCode(HttpStatus.OK)
   async payosWebhook(@Body() body: any) {
     await this.paymentsService.handlePayosWebhook(body);
-    return { success: true };
+    return {
+      error: 0,
+      message: 'Ok',
+      data: null,
+    };
   }
 
   @Post('close-qr')

@@ -11,7 +11,6 @@ import {
 import { Booking } from '../../bookings/entities/booking.entity';
 
 export enum PaymentProvider {
-  VNPAY = 'vnpay',
   PAYOS = 'payos',
 }
 
@@ -38,7 +37,7 @@ export class Payment {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ type: 'enum', enum: PaymentProvider, default: PaymentProvider.VNPAY })
+  @Column({ type: 'enum', enum: PaymentProvider, default: PaymentProvider.PAYOS })
   provider!: PaymentProvider;
 
   @Column({ type: 'enum', enum: PaymentType, default: PaymentType.DEPOSIT })

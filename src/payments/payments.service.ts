@@ -46,6 +46,9 @@ export interface PayosCreatePaymentResult {
   status: string;
   amount: number;
   expiredAt: number;
+  accountNumber?: string;
+  accountName?: string;
+  bankName?: string;
 }
 
 @Injectable()
@@ -159,17 +162,27 @@ export class PaymentsService {
       status: data.status,
       amount,
       expiredAt: data.expiredAt ?? expiredAt,
+      accountNumber: data.accountNumber,
+      accountName: data.accountName,
+      bankName: this.resolveBankName(data.bin),
     };
   }
 
   async handlePayosReturn(query: any): Promise<{ success: boolean; bookingId?: number; message: string }> {
     const orderCode = query.orderCode ? String(query.orderCode) : undefined;
     const paymentLinkId = query.id ? String(query.id) : undefined;
-    const status = String(query.status || '').toUpperCase();
 
     const payment = await this.findPayosPayment(orderCode, paymentLinkId);
     if (!payment) {
       return { success: false, message: 'Không tìm thấy giao dịch payOS' };
+    }
+
+    if ([PaymentStatus.PAID, PaymentStatus.PARTIALLY_PAID].includes(payment.status)) {
+      return {
+        success: true,
+        bookingId: payment.booking?.id,
+        message: 'Thanh toán thành công',
+      };
     }
 
     if (await this.deletePaymentIfExpired(payment)) {
@@ -180,31 +193,42 @@ export class PaymentsService {
       };
     }
 
-    if (status === 'PAID') {
-      const result = await this.markPaymentPaid(payment, Number(payment.amount), query);
-      return {
-        success: true,
-        bookingId: result.booking.id,
-        message: 'Thanh toán thành công',
-      };
-    }
+    try {
+      const payosId = payment.order_code || payment.payment_link_id;
+      if (payosId) {
+        const response = await this.getPayosPaymentRequest(payosId);
+        const actualStatus = String(response?.data?.status || '').toUpperCase();
 
-    if (status === 'CANCELLED') {
-      await this.paymentsRepository.remove(payment);
-      return {
-        success: false,
-        bookingId: payment.booking?.id,
-        message: 'Thanh toán đã bị hủy và giao dịch tạm đã được xóa',
-      };
-    }
+        if (actualStatus === 'PAID') {
+          const paidAmount = Number(response?.data?.amountPaid || response?.data?.amount || payment.amount);
+          const result = await this.markPaymentPaid(payment, paidAmount, response);
+          return {
+            success: true,
+            bookingId: result.booking.id,
+            message: 'Thanh toán thành công',
+          };
+        }
 
-    if (['EXPIRED', 'FAILED'].includes(status)) {
-      await this.paymentsRepository.remove(payment);
-      return {
-        success: false,
-        bookingId: payment.booking?.id,
-        message: 'QR thanh toán đã hết hạn và giao dịch tạm đã được xóa',
-      };
+        if (actualStatus === 'CANCELLED') {
+          await this.paymentsRepository.remove(payment);
+          return {
+            success: false,
+            bookingId: payment.booking?.id,
+            message: 'Thanh toán đã bị hủy và giao dịch tạm đã được xóa',
+          };
+        }
+
+        if (['EXPIRED', 'FAILED'].includes(actualStatus)) {
+          await this.paymentsRepository.remove(payment);
+          return {
+            success: false,
+            bookingId: payment.booking?.id,
+            message: 'QR thanh toán đã hết hạn và giao dịch tạm đã được xóa',
+          };
+        }
+      }
+    } catch (error) {
+      this.configService.get('NODE_ENV') === 'development' && console.error('Lỗi đối soát PayOS:', error);
     }
 
     return {
@@ -228,6 +252,10 @@ export class PaymentsService {
       return {
         message: 'Không tìm thấy giao dịch tạm hoặc giao dịch đã được xử lý',
       };
+    }
+
+    if ([PaymentStatus.PAID, PaymentStatus.PARTIALLY_PAID].includes(payment.status)) {
+      return { success: true, message: 'Giao dịch đã hoàn tất trước đó' };
     }
 
     if (await this.deletePaymentIfExpired(payment)) {
@@ -666,7 +694,26 @@ export class PaymentsService {
   }
 
   private generateOrderCode(): number {
-    return Date.now();
+    // PayOS giới hạn mã đơn hàng (orderCode) tối đa là 13 chữ số.
+    // Lấy timestamp tính bằng giây (10 chữ số) ghép thêm 3 chữ số ngẫu nhiên = 13 chữ số.
+    return Math.floor(Date.now() / 1000) * 1000 + Math.floor(Math.random() * 1000);
+  }
+
+  private resolveBankName(bin?: string): string {
+    if (!bin) return 'Ngân hàng liên kết';
+    const banks: Record<string, string> = {
+      '970415': 'VietinBank',
+      '970418': 'BIDV',
+      '970436': 'Vietcombank',
+      '970407': 'Techcombank',
+      '970422': 'MBBank',
+      '970432': 'VPBank',
+      '970416': 'ACB',
+      '970403': 'Sacombank',
+      '970423': 'TPBank',
+      '970405': 'Agribank',
+    };
+    return banks[bin] || `Ngân hàng (${bin})`;
   }
 
   private requireEnv(key: string): string {
