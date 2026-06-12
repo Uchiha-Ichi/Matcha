@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import sgMail from '@sendgrid/mail';
+import { setApiKey, send } from '@sendgrid/mail';
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
@@ -9,7 +9,7 @@ export class MailService {
   constructor(private readonly configService: ConfigService) {
     const apiKey = this.configService.get<string>('SENDGRID_API');
     if (apiKey) {
-      sgMail.setApiKey(apiKey);
+      setApiKey(apiKey);
       this.logger.log('SendGrid API initialized successfully.');
     } else {
       this.logger.warn('SENDGRID_API key is not defined in the environment variables.');
@@ -57,7 +57,7 @@ export class MailService {
     };
 
     try {
-      await sgMail.send(mailOptions);
+      await send(mailOptions);
       this.logger.log(`SignUp email sent successfully to ${to}`);
       return true;
     } catch (error: any) {
@@ -106,7 +106,7 @@ export class MailService {
     };
 
     try {
-      await sgMail.send(mailOptions);
+      await send(mailOptions);
       this.logger.log(`ForgotPassword OTP email sent successfully to ${to}`);
       return true;
     } catch (error: any) {
@@ -155,7 +155,7 @@ export class MailService {
     };
 
     try {
-      await sgMail.send(mailOptions);
+      await send(mailOptions);
       this.logger.log(`SignUp OTP email sent successfully to ${to}`);
       return true;
     } catch (error: any) {
