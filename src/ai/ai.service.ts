@@ -27,7 +27,7 @@ export class AiService {
       `;
 
       const response = await this.ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-2.0-flash',
         contents: `Yêu cầu ý tưởng chụp ảnh: "${prompt}"`,
         config: {
           systemInstruction,
