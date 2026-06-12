@@ -10,7 +10,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       // 2. Ép kiểu hoặc dùng giá trị mặc định để tránh lỗi 'string | undefined'
       clientID: configService.get<string>('GOOGLE_CLIENT_ID') || '',
       clientSecret: configService.get<string>('GOOGLE_CLIENT_SECRET') || '',
-      callbackURL: 'http://localhost:8000/api/v1/auth/signin/google/callback',
+      callbackURL: configService.get<string>('GOOGLE_CALLBACK_URL') || 'http://localhost:8000/api/v1/auth/signin/google/callback',
       scope: ['email', 'profile'],
     });
   }
