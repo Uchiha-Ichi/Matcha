@@ -170,4 +170,152 @@ export class MailService {
       return false;
     }
   }
+
+  /**
+   * Gửi email xác nhận thanh toán thành công
+   */
+  async sendPaymentSuccessEmail(
+    to: string,
+    fullName: string,
+    booking: any,
+    payment: any
+  ): Promise<boolean> {
+    const formattedAmount = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(payment.amount_paid || payment.amount);
+    const formattedRemaining = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(booking.remaining_amount);
+    const formattedTotal = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(booking.price) - Number(booking.price_discount));
+    
+    const paymentTypeFriendly = payment.payment_type === 'deposit' ? 'Đặt cọc (30%)' : 'Thanh toán còn lại (70%)';
+
+    const mailOptions = {
+      to,
+      from: {
+        email: this.fromEmail,
+        name: 'Matcha Platform Payments',
+      },
+      subject: `[Matcha] Xác nhận thanh toán thành công đơn đặt lịch #${booking.id} 🎉`,
+      html: `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); background-color: #ffffff;">
+          <div style="background: linear-gradient(135deg, #FFB300, #F57C00); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 26px; font-weight: 700; letter-spacing: 0.5px;">Thanh toán thành công!</h1>
+            <p style="margin: 5px 0 0 0; font-size: 15px; opacity: 0.9;">Cảm ơn bạn đã thực hiện thanh toán tại Matcha</p>
+          </div>
+          <div style="padding: 30px; color: #333333; line-height: 1.6;">
+            <p style="font-size: 16px; margin-top: 0;">Xin chào <strong>${fullName}</strong>,</p>
+            <p style="font-size: 15px;">Chúng tôi xin xác nhận đã nhận được khoản thanh toán của bạn cho đơn đặt lịch <strong>#${booking.id}</strong>. Dưới đây là thông tin chi tiết giao dịch:</p>
+            
+            <div style="background-color: #f9f9f9; padding: 20px; border-radius: 10px; margin: 25px 0; border: 1px solid #eeeeee;">
+              <table style="width: 100%; font-size: 15px; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 6px 0; color: #666666;">Mã đơn đặt lịch:</td>
+                  <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #333333;">#${booking.id}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #666666;">Hình thức thanh toán:</td>
+                  <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #333333;">${paymentTypeFriendly}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #666666;">Số tiền vừa thanh toán:</td>
+                  <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #F57C00; font-size: 16px;">${formattedAmount}</td>
+                </tr>
+                <tr style="border-top: 1px solid #e0e0e0;">
+                  <td style="padding: 10px 0 6px 0; color: #666666;">Tổng giá trị đơn:</td>
+                  <td style="padding: 10px 0 6px 0; font-weight: bold; text-align: right; color: #333333;">${formattedTotal}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #666666;">Số tiền còn lại cần thanh toán:</td>
+                  <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #333333;">${formattedRemaining}</td>
+                </tr>
+              </table>
+            </div>
+
+            <p style="font-size: 15px;">Chúng tôi sẽ thông báo cho bạn khi có bất kỳ cập nhật mới nào về lịch trình chụp ảnh của bạn.</p>
+            <div style="text-align: center; margin: 30px 0 10px 0;">
+              <a href="${this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173'}/order-history" style="background-color: #F57C00; color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(245, 124, 0, 0.2); transition: background-color 0.3s;">Xem lịch sử đơn hàng</a>
+            </div>
+          </div>
+          <div style="background-color: #f9f9f9; padding: 20px; text-align: center; font-size: 13px; color: #888888; border-top: 1px solid #eeeeee;">
+            <p style="margin: 0 0 5px 0;">Đây là email tự động từ hệ thống Matcha, vui lòng không trả lời email này.</p>
+            <p style="margin: 0;">&copy; 2026 Matcha Platform. All rights reserved.</p>
+          </div>
+        </div>
+      `,
+    };
+
+    try {
+      await sgMailInstance.send(mailOptions);
+      this.logger.log(`Payment success email sent successfully to ${to} for Booking #${booking.id}`);
+      return true;
+    } catch (error: any) {
+      this.logger.error(`Failed to send payment success email to ${to}: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Gửi email thông báo đơn đặt lịch đã được hoàn thành
+   */
+  async sendBookingCompletedEmail(
+    to: string,
+    fullName: string,
+    booking: any
+  ): Promise<boolean> {
+    const formattedTotal = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(booking.price) - Number(booking.price_discount));
+    
+    const mailOptions = {
+      to,
+      from: {
+        email: this.fromEmail,
+        name: 'Matcha Platform Customer Support',
+      },
+      subject: `[Matcha] Đơn đặt lịch #${booking.id} của bạn đã hoàn thành! ✨`,
+      html: `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); background-color: #ffffff;">
+          <div style="background: linear-gradient(135deg, #4CAF50, #00ACC1); padding: 30px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 26px; font-weight: 700; letter-spacing: 0.5px;">Buổi chụp hoàn tất! 🎉</h1>
+            <p style="margin: 5px 0 0 0; font-size: 15px; opacity: 0.9;">Cảm ơn bạn đã tin tưởng lựa chọn dịch vụ của Matcha</p>
+          </div>
+          <div style="padding: 30px; color: #333333; line-height: 1.6;">
+            <p style="font-size: 16px; margin-top: 0;">Xin chào <strong>${fullName}</strong>,</p>
+            <p style="font-size: 15px;">Chúng tôi xin chúc mừng bạn đã hoàn thành buổi chụp hình cho đơn đặt lịch <strong>#${booking.id}</strong>! Hy vọng bạn đã có một trải nghiệm tuyệt vời cùng đối tác của chúng tôi.</p>
+            
+            <div style="background-color: #f9f9f9; padding: 20px; border-radius: 10px; margin: 25px 0; border: 1px solid #eeeeee;">
+              <h3 style="margin-top: 0; color: #00ACC1;">Thông tin đơn đặt lịch:</h3>
+              <table style="width: 100%; font-size: 15px; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 6px 0; color: #666666;">Mã đơn:</td>
+                  <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #333333;">#${booking.id}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #666666;">Tổng thanh toán:</td>
+                  <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #4CAF50;">${formattedTotal}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #666666;">Trạng thái đơn:</td>
+                  <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #00ACC1; text-transform: uppercase; font-size: 14px;">HOÀN THÀNH</td>
+                </tr>
+              </table>
+            </div>
+
+            <p style="font-size: 15px;">Ý kiến đóng góp của bạn cực kỳ quan trọng giúp Matcha và đối tác nâng cao chất lượng dịch vụ. Hãy dành ra 1 phút để gửi đánh giá và nhận xét về buổi chụp hình này nhé!</p>
+            <div style="text-align: center; margin: 30px 0 10px 0;">
+              <a href="${this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173'}/order-history" style="background-color: #00ACC1; color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(0, 172, 193, 0.2); transition: background-color 0.3s;">Đánh giá dịch vụ ngay</a>
+            </div>
+          </div>
+          <div style="background-color: #f9f9f9; padding: 20px; text-align: center; font-size: 13px; color: #888888; border-top: 1px solid #eeeeee;">
+            <p style="margin: 0 0 5px 0;">Đây là email tự động từ hệ thống Matcha, vui lòng không trả lời email này.</p>
+            <p style="margin: 0;">&copy; 2026 Matcha Platform. All rights reserved.</p>
+          </div>
+        </div>
+      `,
+    };
+
+    try {
+      await sgMailInstance.send(mailOptions);
+      this.logger.log(`Booking completed email sent successfully to ${to} for Booking #${booking.id}`);
+      return true;
+    } catch (error: any) {
+      this.logger.error(`Failed to send booking completed email to ${to}: ${error.message}`);
+      return false;
+    }
+  }
 }

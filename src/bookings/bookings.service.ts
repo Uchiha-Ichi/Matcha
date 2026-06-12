@@ -10,10 +10,14 @@ import { Promotion } from '../promotions/entities/promotion.entity';
 import { PartnerConcept } from '../partner-concepts/entities/partner-concept.entity';
 import { Payment, PaymentStatus } from '../payments/entities/payment.entity';
 import { DateBlock } from '../date-blocks/entities/date-block.entity';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class BookingsService {
-  constructor(private readonly dataSource: DataSource) { }
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly mailService: MailService,
+  ) { }
 
   private parseDurationMinutes(value?: string): number {
     if (!value) return 0;
@@ -387,7 +391,20 @@ export class BookingsService {
       }
 
       booking.status = status;
-      await bookingsRepo.save(booking);
+      const savedBooking = await bookingsRepo.save(booking);
+
+      // Gửi email khi đơn hàng chuyển sang trạng thái HOÀN THÀNH
+      if (status === BookingStatus.COMPLETED) {
+        if (savedBooking.user?.email) {
+          this.mailService.sendBookingCompletedEmail(
+            savedBooking.user.email,
+            savedBooking.user.full_name,
+            savedBooking
+          ).catch((err) => {
+            console.error('Lỗi khi gửi email hoàn tất đơn hàng:', err);
+          });
+        }
+      }
 
       return this.findOne(id, userId, roles);
     });

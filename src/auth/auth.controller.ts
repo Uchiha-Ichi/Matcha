@@ -16,6 +16,8 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { IsEmail, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, MinLength } from 'class-validator';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { UsersService } from '../users/users.service';
+import { AuthGuard } from '@nestjs/passport';
+import { ConfigService } from '@nestjs/config';
 class SignUpDto implements CreateUserDto {
 
   @IsString()
@@ -107,6 +109,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly usersService: UsersService,
+    private readonly configService: ConfigService,
   ) { }
 
   // ────────────────────────────────────────────────────────────────
@@ -158,6 +161,33 @@ export class AuthController {
       accessToken,
       refreshToken,
     };
+  }
+
+  // ────────────────────────────────────────────────────────────────
+  // GET /api/v1/auth/signin/google — Đăng nhập Google
+  // ────────────────────────────────────────────────────────────────
+  @Get('signin/google')
+  @UseGuards(AuthGuard('google'))
+  async googleAuth() {
+    // Passport redirects to Google
+  }
+
+  // ────────────────────────────────────────────────────────────────
+  // GET /api/v1/auth/signin/google/callback — Google OAuth Callback
+  // ────────────────────────────────────────────────────────────────
+  @Get('signin/google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleAuthCallback(@Req() req: any, @Res() res: Response) {
+    const { user, roles } = await this.authService.validateGoogleUser(req.user);
+    const { accessToken, refreshToken } = await this.authService.generateTokens(
+      String(user.id),
+      roles,
+    );
+
+    this.setAuthCookies(res, accessToken, refreshToken);
+
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
+    return res.redirect(`${frontendUrl}/login?accessToken=${accessToken}&refreshToken=${refreshToken}`);
   }
 
   // ────────────────────────────────────────────────────────────────

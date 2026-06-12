@@ -132,6 +132,12 @@ export class UsersService {
     });
   }
 
+  async linkGoogleId(id: number, googleId: string): Promise<User> {
+    const user = await this.findOne(id);
+    user.google_id = googleId;
+    return this.usersRepository.save(user);
+  }
+
   // ─── UPDATE ────────────────────────────────────────────────────────────────
 
   /** Cập nhật thông tin user — hash lại password nếu có */

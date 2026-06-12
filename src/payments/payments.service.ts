@@ -11,6 +11,7 @@ import * as crypto from 'crypto';
 import { DataSource, Repository } from 'typeorm';
 import { Booking, BookingStatus } from '../bookings/entities/booking.entity';
 import { ProcessPaymentDto } from './dto/process-payment.dto';
+import { MailService } from '../mail/mail.service';
 import {
   Payment,
   PaymentProvider,
@@ -58,6 +59,7 @@ export class PaymentsService {
     private readonly paymentsRepository: Repository<Payment>,
     private readonly dataSource: DataSource,
     private readonly configService: ConfigService,
+    private readonly mailService: MailService,
   ) {}
 
   async createPaymentUrl(
@@ -291,6 +293,7 @@ export class PaymentsService {
 
       const booking = await bookingsRepository.findOne({
         where: { id: booking_id },
+        relations: ['user'],
       });
       if (!booking) {
         throw new NotFoundException(`Không tìm thấy đơn đặt lịch #${booking_id}`);
@@ -352,6 +355,17 @@ export class PaymentsService {
 
       const savedPayment = await paymentsRepository.save(payment);
       const savedBooking = await bookingsRepository.save(booking);
+
+      if (booking.user?.email) {
+        this.mailService.sendPaymentSuccessEmail(
+          booking.user.email,
+          booking.user.full_name,
+          savedBooking,
+          savedPayment
+        ).catch((err) => {
+          console.error('Lỗi gửi mail thanh toán thành công (process):', err);
+        });
+      }
 
       return {
         payment: savedPayment,
@@ -619,7 +633,10 @@ export class PaymentsService {
         throw new NotFoundException('Không tìm thấy giao dịch thanh toán');
       }
 
-      const booking = await bookingsRepository.findOne({ where: { id: paymentInTx.booking.id } });
+      const booking = await bookingsRepository.findOne({
+        where: { id: paymentInTx.booking.id },
+        relations: ['user'],
+      });
       if (!booking) {
         throw new NotFoundException('Không tìm thấy đơn đặt lịch');
       }
@@ -651,6 +668,17 @@ export class PaymentsService {
 
       const savedPayment = await paymentsRepository.save(paymentInTx);
       const savedBooking = await bookingsRepository.save(booking);
+
+      if (booking.user?.email) {
+        this.mailService.sendPaymentSuccessEmail(
+          booking.user.email,
+          booking.user.full_name,
+          savedBooking,
+          savedPayment
+        ).catch((err) => {
+          console.error('Lỗi gửi mail thanh toán thành công:', err);
+        });
+      }
 
       return { payment: savedPayment, booking: savedBooking };
     });

@@ -30,7 +30,15 @@ export class AuthService {
     }) {
         let user = await this.usersService.findByGoogleId(profile.googleId);
         if (!user) {
-            user = await this.usersService.createGoogleUser(profile);
+            // Check if user already exists by email
+            user = await this.usersService.findByEmail(profile.email.trim().toLowerCase());
+            if (user) {
+                // Link Google account
+                user = await this.usersService.linkGoogleId(user.id, profile.googleId);
+            } else {
+                // Register new Google account
+                user = await this.usersService.createGoogleUser(profile);
+            }
         }
         // Trả về cả user lẫn roles
         const roles = user.role ? [user.role.name] : [];
@@ -96,6 +104,10 @@ export class AuthService {
         const user = await this.usersService.findByEmail(normalizedEmail);
         if (!user) {
             throw new BadRequestException("Email không tồn tại trong hệ thống");
+        }
+
+        if (!user.password) {
+            throw new BadRequestException("Tài khoản này được đăng ký bằng Google. Vui lòng đăng nhập bằng Google.");
         }
 
         // Tạo OTP gồm 6 chữ số ngẫu nhiên
