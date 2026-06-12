@@ -26,89 +26,110 @@ export class AiService {
         3. Phản hồi của bạn bắt buộc phải bằng tiếng Việt và tuân thủ hoàn toàn định dạng JSON Schema được yêu cầu.
       `;
 
-      const response = await this.ai.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: `Yêu cầu ý tưởng chụp ảnh: "${prompt}"`,
-        config: {
-          systemInstruction,
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: 'object',
-            properties: {
-              isValid: {
-                type: 'boolean',
-                description: 'True nếu yêu cầu của khách hàng liên quan đến chụp ảnh, tạo dáng, trang điểm, trang phục hoặc concept photoshoot. False nếu không liên quan.'
-              },
-              errorMessage: {
-                type: 'string',
-                description: 'Lời nhắn từ chối lịch sự bằng tiếng Việt nếu isValid là false. Để trống nếu isValid là true.'
-              },
-              title: {
-                type: 'string',
-                description: 'Tên concept chụp ảnh ngắn gọn, đầy chất nghệ thuật bằng tiếng Việt (ví dụ: Nàng thơ ven Hồ Tây, Vintage cổ điển Pháp, Đường phố Hà Nội mùa thu...)'
-              },
-              description: {
-                type: 'string',
-                description: 'Mô tả chi tiết câu chuyện, ý nghĩa hoặc thông điệp của concept chụp ảnh bằng tiếng Việt (khoảng 2-3 câu).'
-              },
-              tags: {
-                type: 'array',
-                items: { type: 'string' },
-                description: '5-6 từ khóa (tags) viết hoa liên quan đến concept (ví dụ: ["NÀNG THƠ", "CỔ ĐIỂN", "HỒ TÂY", "LÃNG MẠN"]).'
-              },
-              vibe: {
-                type: 'string',
-                description: 'Mô tả phong cách, không khí, cảm xúc (vibe) mà concept hướng tới bằng tiếng Việt.'
-              },
-              makeupAndCostume: {
-                type: 'string',
-                description: 'Gợi ý chi tiết cách trang điểm (makeup) và chọn lựa trang phục (costume), phụ kiện đi kèm phù hợp bằng tiếng Việt.'
-              },
-              locationRecommendation: {
-                type: 'string',
-                description: 'Gợi ý một số địa điểm chụp ảnh lý tưởng phù hợp với concept này bằng tiếng Việt.'
-              },
-              bestLightTime: {
-                type: 'string',
-                description: 'Khung giờ chụp ảnh đẹp nhất và điều kiện ánh sáng khuyến nghị (ví dụ: 16:00 - 18:30 hoàng hôn, hoặc 7:30 - 9:30 nắng sớm).'
-              },
-              suggestedBudget: {
-                type: 'string',
-                description: 'Ngân sách đề xuất phù hợp cho buổi chụp (ví dụ: 1.500.000 - 3.000.000 VND).'
-              },
-              posingIdeas: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    title: { type: 'string', description: 'Tên tư thế hoặc hành động tạo dáng bằng tiếng Việt.' },
-                    description: { type: 'string', description: 'Mô tả chi tiết cách tạo dáng để bức ảnh tự nhiên nhất bằng tiếng Việt.' }
-                  },
-                  required: ['title', 'description']
-                },
-                description: 'Danh sách 3 gợi ý tạo dáng chụp ảnh độc đáo.'
-              }
-            },
-            required: [
-              'isValid',
-              'errorMessage',
-              'title',
-              'description',
-              'tags',
-              'vibe',
-              'makeupAndCostume',
-              'locationRecommendation',
-              'bestLightTime',
-              'suggestedBudget',
-              'posingIdeas'
-            ]
-          }
-        }
-      });
+      const candidateModels = [
+        'gemini-2.0-flash',
+        'gemini-1.5-flash',
+        'gemini-2.5-flash'
+      ];
 
-      const resultText = response.text;
+      let lastError: any = null;
+      let resultText: string | undefined;
+
+      const config = {
+        systemInstruction,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: 'object',
+          properties: {
+            isValid: {
+              type: 'boolean',
+              description: 'True nếu yêu cầu của khách hàng liên quan đến chụp ảnh, tạo dáng, trang điểm, trang phục hoặc concept photoshoot. False nếu không liên quan.'
+            },
+            errorMessage: {
+              type: 'string',
+              description: 'Lời nhắn từ chối lịch sự bằng tiếng Việt nếu isValid là false. Để trống nếu isValid là true.'
+            },
+            title: {
+              type: 'string',
+              description: 'Tên concept chụp ảnh ngắn gọn, đầy chất nghệ thuật bằng tiếng Việt (ví dụ: Nàng thơ ven Hồ Tây, Vintage cổ điển Pháp, Đường phố Hà Nội mùa thu...)'
+            },
+            description: {
+              type: 'string',
+              description: 'Mô tả chi tiết câu chuyện, ý nghĩa hoặc thông điệp của concept chụp ảnh bằng tiếng Việt (khoảng 2-3 câu).'
+            },
+            tags: {
+              type: 'array',
+              items: { type: 'string' },
+              description: '5-6 từ khóa (tags) viết hoa liên quan đến concept (ví dụ: ["NÀNG THƠ", "CỔ ĐIỂN", "HỒ TÂY", "LÃNG MẠN"]).'
+            },
+            vibe: {
+              type: 'string',
+              description: 'Mô tả phong cách, không khí, cảm xúc (vibe) mà concept hướng tới bằng tiếng Việt.'
+            },
+            makeupAndCostume: {
+              type: 'string',
+              description: 'Gợi ý chi tiết cách trang điểm (makeup) và chọn lựa trang phục (costume), phụ kiện đi kèm phù hợp bằng tiếng Việt.'
+            },
+            locationRecommendation: {
+              type: 'string',
+              description: 'Gợi ý một số địa điểm chụp ảnh lý tưởng phù hợp với concept này bằng tiếng Việt.'
+            },
+            bestLightTime: {
+              type: 'string',
+              description: 'Khung giờ chụp ảnh đẹp nhất và điều kiện ánh sáng khuyến nghị (ví dụ: 16:00 - 18:30 hoàng hôn, hoặc 7:30 - 9:30 nắng sớm).'
+            },
+            suggestedBudget: {
+              type: 'string',
+              description: 'Ngân sách đề xuất phù hợp cho buổi chụp (ví dụ: 1.500.000 - 3.000.000 VND).'
+            },
+            posingIdeas: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  title: { type: 'string', description: 'Tên tư thế hoặc hành động tạo dáng bằng tiếng Việt.' },
+                  description: { type: 'string', description: 'Mô tả chi tiết cách tạo dáng để bức ảnh tự nhiên nhất bằng tiếng Việt.' }
+                },
+                required: ['title', 'description']
+              },
+              description: 'Danh sách 3 gợi ý tạo dáng chụp ảnh độc đáo.'
+            }
+          },
+          required: [
+            'isValid',
+            'errorMessage',
+            'title',
+            'description',
+            'tags',
+            'vibe',
+            'makeupAndCostume',
+            'locationRecommendation',
+            'bestLightTime',
+            'suggestedBudget',
+            'posingIdeas'
+          ]
+        }
+      };
+
+      for (const model of candidateModels) {
+        try {
+          const response = await this.ai.models.generateContent({
+            model,
+            contents: `Yêu cầu ý tưởng chụp ảnh: "${prompt}"`,
+            config,
+          });
+          if (response?.text) {
+            resultText = response.text;
+            break;
+          }
+        } catch (error: any) {
+          lastError = error;
+          console.warn(`[Gemini AI Warning]: Model ${model} failed with message: ${error.message || error}`);
+        }
+      }
+
       if (!resultText) {
-        throw new Error('Gemini AI không trả về phản hồi.');
+        throw new Error(lastError?.message || 'Tất cả các model Gemini đều đang bận hoặc hết hạn ngạch.');
       }
 
       return JSON.parse(resultText);
