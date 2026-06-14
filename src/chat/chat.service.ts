@@ -113,11 +113,10 @@ export class ChatService {
       .leftJoinAndSelect('partner_concept.concept', 'concept')
       .orderBy('conv.updated_at', 'DESC');
 
-    if (roles.includes('admin')) {
-      // Admin xem tất cả
-    } else if (roles.includes('partner')) {
+    if (roles.includes('partner')) {
       qb.where('partner.user = :userId', { userId });
     } else {
+      // admin hoặc customer chỉ xem chat của chính mình
       qb.where('user.id = :userId', { userId });
     }
 
@@ -207,11 +206,10 @@ export class ChatService {
       .where('message.is_read = false')
       .andWhere('message.user_id != :userId', { userId });
 
-    if (roles.includes('admin')) {
-      // Admin sees all unread messages from other users.
-    } else if (roles.includes('partner')) {
+    if (roles.includes('partner')) {
       qb.andWhere('partner.user_id = :userId', { userId });
     } else {
+      // admin hoặc customer chỉ tính tin nhắn chưa đọc của chính mình
       qb.andWhere('conversation.user_id = :userId', { userId });
     }
 
