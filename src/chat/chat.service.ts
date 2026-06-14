@@ -59,7 +59,14 @@ export class ChatService {
         partner: { id: targetPartnerId },
         ...(booking_id ? { booking: { id: booking_id } } : {}),
       },
-      relations: ['user', 'partner', 'booking'],
+      relations: [
+        'user',
+        'partner',
+        'booking',
+        'booking.details',
+        'booking.details.partner_concept',
+        'booking.details.partner_concept.concept',
+      ],
     });
 
     if (existing) return existing;
@@ -78,7 +85,18 @@ export class ChatService {
     }
 
     const conversation = this.conversationRepo.create({ user, partner, booking });
-    return this.conversationRepo.save(conversation);
+    const saved = await this.conversationRepo.save(conversation);
+    return this.conversationRepo.findOne({
+      where: { id: saved.id },
+      relations: [
+        'user',
+        'partner',
+        'booking',
+        'booking.details',
+        'booking.details.partner_concept',
+        'booking.details.partner_concept.concept',
+      ],
+    }) as Promise<Conversation>;
   }
 
   /**
@@ -90,6 +108,9 @@ export class ChatService {
       .leftJoinAndSelect('conv.user', 'user')
       .leftJoinAndSelect('conv.partner', 'partner')
       .leftJoinAndSelect('conv.booking', 'booking')
+      .leftJoinAndSelect('booking.details', 'details')
+      .leftJoinAndSelect('details.partner_concept', 'partner_concept')
+      .leftJoinAndSelect('partner_concept.concept', 'concept')
       .orderBy('conv.updated_at', 'DESC');
 
     if (roles.includes('admin')) {
