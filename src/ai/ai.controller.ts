@@ -50,6 +50,7 @@ export class AiController {
         partner: pc.partner?.band_name ?? 'Matcha Partner',
         partnerId: `#${pc.partner?.id}`,
         partnerConceptId: pc.id,
+        slug: pc.slug,
         rating: pc.partner?.rating_avg > 0 ? Number(pc.partner.rating_avg).toFixed(1) : '5.0',
         price: Number(pc.price),
         image: pc.image_des || pc.partner?.cover_image || 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=900&q=80',

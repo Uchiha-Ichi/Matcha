@@ -22,9 +22,13 @@ export class PartnerConceptsController {
     return this.partnerConceptsService.findAll();
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.partnerConceptsService.findOne(+id);
+  @Get(':param')
+  findOne(@Param('param') param: string) {
+    if (/^\d+$/.test(param)) {
+      return this.partnerConceptsService.findOne(+param);
+    } else {
+      return this.partnerConceptsService.findOneBySlug(param);
+    }
   }
 
   // ── Protected write endpoints ──────────────────────────────────────────────
