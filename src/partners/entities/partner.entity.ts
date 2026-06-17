@@ -14,7 +14,30 @@ export class Partner {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
-  @Column({ type: 'point' })
+  @Column({
+    type: 'point',
+    transformer: {
+      // DB → code: MySQL trả binary/object, chuyển thành WKT string "POINT(lng lat)"
+      from: (value: any): string | null => {
+        if (!value) return null;
+        if (typeof value === 'string') return value
+        // TypeORM MySQL driver trả { x: lng, y: lat }
+        if (typeof value === 'object' && 'x' in value && 'y' in value) {
+          return `POINT(${value.x} ${value.y})`
+        }
+        return String(value)
+      },
+      // code → DB: luôn lưu dạng WKT string
+      to: (value: any): string | null => {
+        if (!value) return null;
+        if (typeof value === 'string') return value
+        if (typeof value === 'object' && 'x' in value) {
+          return `POINT(${value.x} ${value.y})`
+        }
+        return String(value)
+      },
+    },
+  })
   location_gps!: string;
 
   @Column({ default: true })

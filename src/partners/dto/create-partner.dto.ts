@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsBoolean, IsNumber, IsOptional } from 'class-validator';
+import { IsNotEmpty, IsString, IsBoolean, IsNumber, IsOptional, Matches } from 'class-validator';
 
 export class CreatePartnerDto {
     @IsString()
@@ -11,6 +11,9 @@ export class CreatePartnerDto {
 
     @IsString()
     @IsNotEmpty()
+    @Matches(/^POINT\([-\d.]+ [-\d.]+\)$/i, {
+        message: 'location_gps phải có dạng POINT(longitude latitude), VD: POINT(105.8342 21.0245)'
+    })
     location_gps!: string;
 
     @IsString()
