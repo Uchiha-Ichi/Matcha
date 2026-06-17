@@ -9,6 +9,7 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ImageService } from 'src/image/image.service';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { Public } from 'src/common/decorators/public.decorator';
 
 @Controller('partners')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -31,6 +32,7 @@ export class PartnersController {
   }
 
   @Get('search/nearby')
+  @Public()
   async searchNearby(@Query() searchNearbyDto: SearchNearbyDto) {
     return this.partnersService.searchNearby(
       searchNearbyDto.latitude,
