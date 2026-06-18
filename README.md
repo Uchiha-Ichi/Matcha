@@ -1,99 +1,148 @@
+# Matcha Backend
+
 <p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
+  <a href="https://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Hệ thống Backend cho dự án **Matcha** — Nền tảng kết nối, đặt lịch chụp ảnh (booking), quản lý concepts và các đối tác dịch vụ nhiếp ảnh (partners). Dự án được phát triển dựa trên framework **NestJS** với cấu trúc module rõ ràng, tối ưu hóa hiệu năng, bảo mật và tích hợp nhiều dịch vụ thông minh.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## 🔗 Liên kết Dự án
 
-## Description
+* **Frontend Repository (FE):** [Matcha_FE](https://github.com/Uchiha-Ichi/Matcha_FE)
+* **Website Sản phẩm (Production):** [https://www.matcha.net.vn/](https://www.matcha.net.vn/)
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+---
 
-## Project setup
+## 🚀 Công nghệ Sử dụng (Tech Stack)
 
-```bash
-$ pnpm install
-```
+Hệ thống được xây dựng bằng các công nghệ mạnh mẽ và hiện đại:
 
-## Compile and run the project
+* **Core Framework:** [NestJS](https://nestjs.com/) (v11.x) - Progressive Node.js framework
+* **Language:** TypeScript
+* **Database & ORM:** MySQL + [TypeORM](https://typeorm.io/)
+* **Caching & Session:** Redis (ioredis + cache-manager)
+* **Authentication:** Passport JWT + Google OAuth 2.0 (lưu và xác thực Refresh Token qua Redis)
+* **Real-time:** Socket.io (WebSockets) cho hệ thống chat & thông báo
+* **Logging:** Pino Logger (`nestjs-pino`, `pino-pretty`)
+* **Media Storage:** Cloudinary & AWS S3 SDK
+* **Email Service:** SendGrid Mail SDK
+* **AI Integration:** Google Gemini API (`@google/genai` & `@google/generative-ai`)
+* **Package Manager:** `pnpm`
+
+---
+
+## 📁 Cấu trúc Thư mục Chính (`src/`)
 
 ```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+src/
+├── ai/                     # Tích hợp Google Gemini AI
+├── auth/                   # Hệ thống xác thực (JWT + Google OAuth)
+├── bookings/               # Quản lý đặt lịch (Booking)
+├── booking-details/        # Chi tiết đơn đặt lịch
+├── carts/                  # Quản lý giỏ hàng
+├── categories/             # Phân loại dịch vụ/concept
+├── chat/                   # Tính năng chat Real-time (Socket.io)
+├── common/                 # Guards, Decorators, Filters, Middleware dùng chung
+│   ├── middleware/         # LoggerMiddleware (Pino)
+│   ├── guards/             # JwtAuthGuard, RolesGuard
+│   ├── filters/            # AllExceptionsFilter (Format lỗi chuẩn)
+│   └── decorators/         # @Roles(), @CurrentUser()
+├── concepts/               # Các Concept chụp ảnh
+├── conversations/          # Quản lý cuộc hội thoại chat
+├── date-blocks/            # Quản lý ngày bận/chặn lịch của đối tác (partners)
+├── feedbacks/              # Đánh giá, phản hồi từ khách hàng
+├── image/                  # Xử lý & upload hình ảnh (S3/Cloudinary)
+├── mail/                   # Gửi email qua SendGrid
+├── messages/               # Nội dung tin nhắn chi tiết
+├── notifications/          # Hệ thống thông báo người dùng
+├── partner-concepts/       # Mối liên kết giữa Đối tác và Concept
+├── partners/               # Đối tác/Thợ chụp ảnh (Partners)
+├── payments/               # Tích hợp cổng thanh toán
+├── promotions/             # Mã giảm giá, khuyến mại
+├── roles/                  # Phân quyền hệ thống (admin, partner, user)
+├── statistics/             # Thống kê báo cáo số liệu cho Admin
+├── users/                  # Quản lý tài khoản người dùng
+├── app.module.ts           # Root module cấu hình ứng dụng
+└── main.ts                 # Điểm khởi chạy hệ thống (Bootstrap)
 ```
 
-## Run tests
+---
 
+## 🛠️ Hướng dẫn Cài đặt & Khởi chạy
+
+### 1. Yêu cầu Hệ thống
+* Node.js (phiên bản khuyến nghị: v18 hoặc v20)
+* MySQL Server
+* Redis Server
+* Trình quản lý gói `pnpm` (Nếu chưa cài: `npm install -g pnpm`)
+
+### 2. Cài đặt Dependencies
+Di chuyển vào thư mục backend và chạy lệnh sau để cài đặt thư viện:
 ```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+pnpm install
 ```
 
-## Deployment
+### 3. Cấu hình Biến môi trường (`.env`)
+Tạo file `.env` tại thư mục gốc của backend và điền các cấu hình mẫu sau:
+```env
+# Server Config
+PORT=8000
+NODE_ENV=development
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+# MySQL Database
+DB_HOST=localhost
+DB_PORT=3306
+DB_USERNAME=root
+DB_PASSWORD=your_mysql_password
+DB_DATABASE=matcha
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+# Redis Config
+REDIS_URL=redis://localhost:6379
 
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+# JWT Security
+JWT_ACCESS_SECRET=your_jwt_access_secret
+JWT_REFRESH_SECRET=your_jwt_refresh_secret
+
+# Google OAuth
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+
+# Frontend URL (CORS)
+FRONTEND_URL=http://localhost:3000
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### 4. Khởi chạy Ứng dụng
 
-## Resources
+* **Chế độ Phát triển (Development):**
+  ```bash
+  pnpm run start:dev
+  ```
+  *Ứng dụng sẽ tự động khởi chạy tại cổng `8000` (hoặc cổng được định nghĩa trong `.env`) kèm cơ chế tự động tải lại khi code thay đổi (Hot Reload).*
 
-Check out a few resources that may come in handy when working with NestJS:
+* **Chế độ Production:**
+  ```bash
+  pnpm run build
+  pnpm run start:prod
+  ```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+---
 
-## Support
+## 🔒 Cơ chế Bảo mật & Phân quyền
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+1. **Xác thực qua JWT & Cookie:**
+   * Access Token có hiệu lực ngắn (15 phút), được gửi kèm trong request header hoặc cookie.
+   * Refresh Token có hiệu lực dài (7 ngày), lưu an toàn trong httpOnly Cookie và được kiểm tra tính hợp lệ bằng redis hash (Key: `refresh:{userId}`).
+2. **Phân quyền Role-based:**
+   * Sử dụng decorator `@Roles('admin')`, `@Roles('partner')` để hạn chế quyền truy cập route.
+   * Các Guards chạy theo thứ tự bắt buộc: `JwtAuthGuard` ➔ `RolesGuard`.
+3. **Log & Exception Handling:**
+   * Mọi HTTP request được ghi log chi tiết bởi Pino Logger thông qua `LoggerMiddleware`.
+   * Lỗi phát sinh trong ứng dụng được bắt và chuẩn hóa định dạng JSON trả về qua `AllExceptionsFilter` giúp bảo mật stack trace phía máy chủ.
 
-## Stay in touch
+---
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+## 🤝 Liên hệ & Đóng góp
+Dự án được duy trì bởi đội ngũ Matcha. Mọi đóng góp xin vui lòng gửi Pull Request hoặc tạo Issue tại repository tương ứng.
 
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
-# Matcha
+* **Frontend Repo:** [Matcha_FE](https://github.com/Uchiha-Ichi/Matcha_FE)
+* **Website:** [www.matcha.net.vn](https://www.matcha.net.vn/)
